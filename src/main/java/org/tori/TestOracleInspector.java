@@ -148,24 +148,7 @@ public class TestOracleInspector {
      */
     private boolean isAssertionMethod(String methodName) {
         // Common JUnit assertion methods
-        return methodName.startsWith("assert") || 
-               methodName.equals("fail") ||
-               methodName.equals("assertTrue") ||
-               methodName.equals("assertFalse") ||
-               methodName.equals("assertEquals") ||
-               methodName.equals("assertNotEquals") ||
-               methodName.equals("assertNull") ||
-               methodName.equals("assertNotNull") ||
-               methodName.equals("assertSame") ||
-               methodName.equals("assertNotSame") ||
-               methodName.equals("assertArrayEquals") ||
-               methodName.equals("assertThrows") ||
-               methodName.equals("assertDoesNotThrow") ||
-               methodName.equals("assertAll") ||
-               methodName.equals("assertIterableEquals") ||
-               methodName.equals("assertLinesMatch") ||
-               methodName.equals("assertTimeout") ||
-               methodName.equals("assertTimeoutPreemptively");
+        return methodName.startsWith("assert") || methodName.equals("fail");
     }
 
     /**
