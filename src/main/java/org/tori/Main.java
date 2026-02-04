@@ -29,8 +29,17 @@ public class Main {
                 .argName("METHOD")
                 .build();
         
+        Option metricOption = Option.builder("metric")
+                .longOpt("metric")
+                .hasArg()
+                .required(false)
+                .desc("Class name of the metric to use for oracle assessment (optional)")
+                .argName("METRIC_CLASS")
+                .build();
+        
         options.addOption(testFileOption);
         options.addOption(testMethodOption);
+        options.addOption(metricOption);
 
         // Parse command-line arguments
         CommandLineParser parser = new DefaultParser();
@@ -48,6 +57,7 @@ public class Main {
 
         String testFilePath = cmd.getOptionValue("t");
         String testMethodName = cmd.getOptionValue("m");
+        String metricClassName = cmd.getOptionValue("metric");
 
         try {
             // Read the test file
@@ -63,6 +73,21 @@ public class Main {
             TestOracleInspector inspector = new TestOracleInspector();
             List<MethodOracles> results = inspector.findOracles(sourceCode, testMethodName);
 
+            // Load metric if specified
+            org.tori.metrics.Metric metric = null;
+            if (metricClassName != null) {
+                try {
+                    Class<?> metricClass = Class.forName(metricClassName);
+                    metric = (org.tori.metrics.Metric) metricClass.getDeclaredConstructor().newInstance();
+                } catch (ClassNotFoundException e) {
+                    System.err.println("Error: Metric class not found: " + metricClassName);
+                    System.exit(1);
+                } catch (Exception e) {
+                    System.err.println("Error: Failed to instantiate metric: " + e.getMessage());
+                    System.exit(1);
+                }
+            }
+
             // Print results
             if (results.isEmpty()) {
                 if (testMethodName != null) {
@@ -77,7 +102,12 @@ public class Main {
                         System.out.println("  No assertions found");
                     } else {
                         for (String oracle : methodOracles.oracles()) {
-                            System.out.println("  - " + oracle);
+                            if (metric != null) {
+                                double score = metric.assess(methodOracles.testCaseSource(), oracle);
+                                System.out.println("  - " + oracle + " [score: " + String.format("%.2f", score) + "]");
+                            } else {
+                                System.out.println("  - " + oracle);
+                            }
                         }
                     }
                     System.out.println();
