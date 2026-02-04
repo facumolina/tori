@@ -24,6 +24,28 @@ To create a standalone executable JAR with all dependencies:
 
 The fat JAR will be created at `build/libs/tori-1.0.0-all.jar`.
 
+## Running Tests
+
+To run the test suite:
+
+```bash
+./gradlew test
+```
+
+To run tests with detailed output:
+
+```bash
+./gradlew test --info
+```
+
+To view the HTML test report after running tests:
+
+```bash
+open build/reports/tests/test/index.html
+```
+
+The test suite includes tests that verify the correct number of assertions are recovered from example test files located in `src/test/resources/`.
+
 ## Usage
 
 ### Using Gradle
@@ -57,7 +79,7 @@ java -jar build/libs/tori-1.0.0-all.jar <path-to-test-file.java> <test-method-na
 ### Example 1: Analyze all test methods
 
 ```bash
-./gradlew run --args="examples/CalculatorTest.java"
+./gradlew run --args="src/test/resources/CalculatorTest.java"
 ```
 
 Output:
@@ -79,7 +101,7 @@ Test Method: testMultiplication
 ### Example 2: Analyze a specific test method
 
 ```bash
-./gradlew run --args="examples/CalculatorTest.java testAddition"
+./gradlew run --args="src/test/resources/CalculatorTest.java testAddition"
 ```
 
 Output:
@@ -116,15 +138,21 @@ tori/
 ├── settings.gradle           # Gradle settings
 ├── gradle.properties         # Gradle properties
 ├── src/
-│   └── main/
-│       └── java/
-│           └── org/
-│               └── tori/
-│                   ├── Main.java                    # Entry point
-│                   ├── TestOracleInspector.java    # Tree-sitter parser logic
-│                   └── MethodOracles.java          # Data model
-└── examples/
-    └── CalculatorTest.java   # Example test file
+│   ├── main/
+│   │   └── java/
+│   │       └── org/
+│   │           └── tori/
+│   │               ├── Main.java                    # Entry point
+│   │               ├── TestOracleInspector.java    # Tree-sitter parser logic
+│   │               └── MethodOracles.java          # Data model
+│   └── test/
+│       ├── java/
+│       │   └── org/
+│       │       └── tori/
+│       │           └── TestOracleInspectorTest.java # Test suite
+│       └── resources/
+│           ├── CalculatorTest.java   # Example test file
+│           └── StringUtilsTest.java  # Example test file
 ```
 
 ## License
