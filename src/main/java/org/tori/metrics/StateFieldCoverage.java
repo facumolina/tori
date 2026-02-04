@@ -9,6 +9,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 /**
@@ -23,6 +24,7 @@ public class StateFieldCoverage implements Metric {
     private final TSLanguage javaLanguage;
     private final Map<String, Set<String>> classFieldsCache;
     private final Map<String, Map<String, Set<String>>> methodFieldAccessCache;
+    private String targetClassPath;
     
     public StateFieldCoverage() {
         this.javaLanguage = new TreeSitterJava();
@@ -30,6 +32,21 @@ public class StateFieldCoverage implements Metric {
         parser.setLanguage(javaLanguage);
         this.classFieldsCache = new HashMap<>();
         this.methodFieldAccessCache = new HashMap<>();
+        this.targetClassPath = null;
+    }
+    
+    /**
+     * Configure the metric with properties.
+     * Expected property: target_class - the path to the target class file
+     * 
+     * @param config Properties object containing metric configuration
+     */
+    @Override
+    public void configure(Properties config) {
+        this.targetClassPath = config.getProperty("target_class");
+        if (this.targetClassPath == null || this.targetClassPath.isEmpty()) {
+            throw new IllegalArgumentException("Configuration must contain 'target_class' property with the path to the target class");
+        }
     }
     
     /**
@@ -42,20 +59,25 @@ public class StateFieldCoverage implements Metric {
      */
     @Override
     public double assess(String testCase, String oracle) {
-        // Extract the target class from the test case
-        String className = extractTargetClassName(testCase);
-        if (className == null || className.isEmpty()) {
-            return 0.0;
+        // Use configured target class path if available, otherwise extract from test case
+        String classPath = targetClassPath;
+        if (classPath == null || classPath.isEmpty()) {
+            // Fallback: extract the target class from the test case
+            String className = extractTargetClassName(testCase);
+            if (className == null || className.isEmpty()) {
+                return 0.0;
+            }
+            classPath = "src/test/resources/" + className + ".java";
         }
         
         // Get all fields in the target class
-        Set<String> allFields = getAllFieldsInClass(className);
+        Set<String> allFields = getAllFieldsInClass(classPath);
         if (allFields.isEmpty()) {
             return 0.0;
         }
         
         // Get fields accessed by the oracle
-        Set<String> accessedFields = getFieldsAccessedByOracle(testCase, oracle, className);
+        Set<String> accessedFields = getFieldsAccessedByOracle(testCase, oracle, classPath);
         
         // Calculate coverage
         return (double) accessedFields.size() / allFields.size();
@@ -134,32 +156,24 @@ public class StateFieldCoverage implements Metric {
     /**
      * Get all fields defined in a class, including fields from inner classes.
      */
-    private Set<String> getAllFieldsInClass(String className) {
-        if (classFieldsCache.containsKey(className)) {
-            return classFieldsCache.get(className);
+    private Set<String> getAllFieldsInClass(String classPath) {
+        if (classFieldsCache.containsKey(classPath)) {
+            return classFieldsCache.get(classPath);
         }
         
         Set<String> fields = new HashSet<>();
         
-        // Try to find the class file in src/test/resources (relative path)
-        String[] possiblePaths = {
-            "src/test/resources/" + className + ".java"
-        };
-        
-        for (String pathStr : possiblePaths) {
-            Path path = Paths.get(pathStr);
-            if (Files.exists(path)) {
-                try {
-                    String classSource = Files.readString(path);
-                    fields = extractFieldsFromClass(classSource);
-                    break;
-                } catch (IOException e) {
-                    // Continue to next path
-                }
+        Path path = Paths.get(classPath);
+        if (Files.exists(path)) {
+            try {
+                String classSource = Files.readString(path);
+                fields = extractFieldsFromClass(classSource);
+            } catch (IOException e) {
+                // Failed to read class file
             }
         }
         
-        classFieldsCache.put(className, fields);
+        classFieldsCache.put(classPath, fields);
         return fields;
     }
     
@@ -227,7 +241,7 @@ public class StateFieldCoverage implements Metric {
      * Get the fields accessed by an oracle statement.
      * This traces method calls to determine which fields are accessed.
      */
-    private Set<String> getFieldsAccessedByOracle(String testCase, String oracle, String className) {
+    private Set<String> getFieldsAccessedByOracle(String testCase, String oracle, String classPath) {
         Set<String> accessedFields = new HashSet<>();
         
         TSTree tree = parser.parseString(null, oracle);
@@ -239,7 +253,7 @@ public class StateFieldCoverage implements Metric {
         
         // For each method call, determine which fields it accesses
         for (String methodName : methodCalls) {
-            Set<String> methodFields = getFieldsAccessedByMethod(className, methodName);
+            Set<String> methodFields = getFieldsAccessedByMethod(classPath, methodName);
             accessedFields.addAll(methodFields);
         }
         
@@ -302,36 +316,28 @@ public class StateFieldCoverage implements Metric {
      * Get the fields accessed by a specific method in a class.
      * This analyzes the method body to determine which fields are accessed.
      */
-    private Set<String> getFieldsAccessedByMethod(String className, String methodName) {
-        String cacheKey = className + "." + methodName;
+    private Set<String> getFieldsAccessedByMethod(String classPath, String methodName) {
+        String cacheKey = classPath + "." + methodName;
         
-        if (methodFieldAccessCache.containsKey(className) && 
-            methodFieldAccessCache.get(className).containsKey(methodName)) {
-            return methodFieldAccessCache.get(className).get(methodName);
+        if (methodFieldAccessCache.containsKey(classPath) && 
+            methodFieldAccessCache.get(classPath).containsKey(methodName)) {
+            return methodFieldAccessCache.get(classPath).get(methodName);
         }
         
         Set<String> accessedFields = new HashSet<>();
         
-        // Try to find the class file (relative path)
-        String[] possiblePaths = {
-            "src/test/resources/" + className + ".java"
-        };
-        
-        for (String pathStr : possiblePaths) {
-            Path path = Paths.get(pathStr);
-            if (Files.exists(path)) {
-                try {
-                    String classSource = Files.readString(path);
-                    accessedFields = extractFieldAccessFromMethod(classSource, methodName);
-                    break;
-                } catch (IOException e) {
-                    // Continue to next path
-                }
+        Path path = Paths.get(classPath);
+        if (Files.exists(path)) {
+            try {
+                String classSource = Files.readString(path);
+                accessedFields = extractFieldAccessFromMethod(classSource, methodName);
+            } catch (IOException e) {
+                // Failed to read class file
             }
         }
         
         // Cache the result
-        methodFieldAccessCache.computeIfAbsent(className, k -> new HashMap<>())
+        methodFieldAccessCache.computeIfAbsent(classPath, k -> new HashMap<>())
             .put(methodName, accessedFields);
         
         return accessedFields;

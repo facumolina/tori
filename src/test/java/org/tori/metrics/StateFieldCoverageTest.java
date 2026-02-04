@@ -3,6 +3,8 @@ package org.tori.metrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Properties;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -20,6 +22,11 @@ class StateFieldCoverageTest {
     @BeforeEach
     void setUp() {
         metric = new StateFieldCoverage();
+        
+        // Configure the metric with the target class path
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/IntsList.java");
+        metric.configure(config);
     }
 
     @Test
