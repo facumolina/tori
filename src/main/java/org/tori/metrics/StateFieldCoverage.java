@@ -63,6 +63,9 @@ public class StateFieldCoverage implements Metric {
         String classPath = targetClassPath;
         if (classPath == null || classPath.isEmpty()) {
             // Fallback: extract the target class from the test case
+            // Note: This fallback is primarily for backward compatibility and testing purposes
+            // The hardcoded 'src/test/resources/' path is intentional as this metric is designed
+            // to work with test resources. For production use, always provide a configuration file.
             String className = extractTargetClassName(testCase);
             if (className == null || className.isEmpty()) {
                 return 0.0;

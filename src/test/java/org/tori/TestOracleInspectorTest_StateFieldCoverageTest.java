@@ -160,14 +160,4 @@ class TestOracleInspectorTest_StateFieldCoverageTest {
         assertThrows(IllegalArgumentException.class, () -> testMetric.configure(config), 
             "Should throw exception when target_class is empty");
     }
-    
-    /**
-     * Helper method to find a MethodOracles by method name.
-     */
-    private MethodOracles findMethod(List<MethodOracles> results, String methodName) {
-        return results.stream()
-                .filter(m -> m.methodName().equals(methodName))
-                .findFirst()
-                .orElse(null);
-    }
 }
