@@ -4,9 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,12 +23,21 @@ class TestOracleInspectorTest {
     void setUp() throws IOException {
         inspector = new TestOracleInspector();
         
-        // Load test files from resources
-        Path calculatorPath = Paths.get("src/test/resources/CalculatorTest.java");
-        Path stringUtilsPath = Paths.get("src/test/resources/StringUtilsTest.java");
-        
-        calculatorTestContent = Files.readString(calculatorPath);
-        stringUtilsTestContent = Files.readString(stringUtilsPath);
+        // Load test files from classpath resources
+        calculatorTestContent = loadResourceAsString("/CalculatorTest.java");
+        stringUtilsTestContent = loadResourceAsString("/StringUtilsTest.java");
+    }
+    
+    /**
+     * Load a resource file from classpath as a string.
+     */
+    private String loadResourceAsString(String resourcePath) throws IOException {
+        try (InputStream inputStream = getClass().getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                throw new IOException("Resource not found: " + resourcePath);
+            }
+            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
     
     @Test

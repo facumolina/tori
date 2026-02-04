@@ -38,10 +38,10 @@ To run tests with detailed output:
 ./gradlew test --info
 ```
 
-To view the HTML test report after running tests:
+To view the HTML test report after running tests, open the following file in your browser:
 
-```bash
-open build/reports/tests/test/index.html
+```
+build/reports/tests/test/index.html
 ```
 
 The test suite includes tests that verify the correct number of assertions are recovered from example test files located in `src/test/resources/`.
