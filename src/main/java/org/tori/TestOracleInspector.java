@@ -74,12 +74,17 @@ public class TestOracleInspector {
             return;
         }
 
+        // Extract the full method source code
+        int startByte = methodNode.getStartByte();
+        int endByte = methodNode.getEndByte();
+        String testCaseSource = sourceCode.substring(startByte, endByte);
+
         // Find all assertions in this method
         List<String> oracles = new ArrayList<>();
         findAssertions(methodNode, sourceCode, oracles);
 
         // Add to results
-        results.add(new MethodOracles(methodName, oracles));
+        results.add(new MethodOracles(methodName, oracles, testCaseSource));
     }
 
     /**
