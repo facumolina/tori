@@ -21,6 +21,9 @@ dependencies {
     implementation 'io.github.bonede:tree-sitter:0.21.0'
     implementation 'io.github.bonede:tree-sitter-java:0.21.0'
     
+    // Apache Commons CLI for command-line argument parsing
+    implementation 'commons-cli:commons-cli:1.6.0'
+    
     // JUnit for testing
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
