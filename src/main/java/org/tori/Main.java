@@ -1,5 +1,7 @@
 package org.tori;
 
+import org.apache.commons.cli.*;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -8,13 +10,44 @@ import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
-        if (args.length < 1) {
-            System.err.println("Usage: java -jar tori.jar <test-file.java> [test-method-name]");
+        // Define command-line options
+        Options options = new Options();
+        
+        Option testFileOption = Option.builder("t")
+                .longOpt("test-file")
+                .hasArg()
+                .required()
+                .desc("Path to the test file (required)")
+                .argName("FILE")
+                .build();
+        
+        Option testMethodOption = Option.builder("m")
+                .longOpt("test-method")
+                .hasArg()
+                .required(false)
+                .desc("Name of the specific test method to analyze (optional)")
+                .argName("METHOD")
+                .build();
+        
+        options.addOption(testFileOption);
+        options.addOption(testMethodOption);
+
+        // Parse command-line arguments
+        CommandLineParser parser = new DefaultParser();
+        HelpFormatter formatter = new HelpFormatter();
+        CommandLine cmd = null;
+
+        try {
+            cmd = parser.parse(options, args);
+        } catch (ParseException e) {
+            System.err.println("Error: " + e.getMessage());
+            System.err.println();
+            formatter.printHelp("tori", options);
             System.exit(1);
         }
 
-        String testFilePath = args[0];
-        String testMethodName = args.length > 1 ? args[1] : null;
+        String testFilePath = cmd.getOptionValue("t");
+        String testMethodName = cmd.getOptionValue("m");
 
         try {
             // Read the test file

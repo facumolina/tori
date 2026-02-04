@@ -52,12 +52,12 @@ The test suite includes tests that verify the correct number of assertions are r
 
 Analyze all test methods in a file:
 ```bash
-./gradlew run --args="<path-to-test-file.java>"
+./gradlew run --args="-t <path-to-test-file.java>"
 ```
 
 Analyze a specific test method:
 ```bash
-./gradlew run --args="<path-to-test-file.java> <test-method-name>"
+./gradlew run --args="-t <path-to-test-file.java> -m <test-method-name>"
 ```
 
 ### Using the Standalone JAR
@@ -66,20 +66,25 @@ After building the fat JAR:
 
 Analyze all test methods:
 ```bash
-java -jar build/libs/tori-1.0.0-all.jar <path-to-test-file.java>
+java -jar build/libs/tori-1.0.0-all.jar -t <path-to-test-file.java>
 ```
 
 Analyze a specific test method:
 ```bash
-java -jar build/libs/tori-1.0.0-all.jar <path-to-test-file.java> <test-method-name>
+java -jar build/libs/tori-1.0.0-all.jar -t <path-to-test-file.java> -m <test-method-name>
 ```
+
+### Command-Line Options
+
+- `-t, --test-file <FILE>`: Path to the test file (required)
+- `-m, --test-method <METHOD>`: Name of the specific test method to analyze (optional)
 
 ## Examples
 
 ### Example 1: Analyze all test methods
 
 ```bash
-./gradlew run --args="src/test/resources/CalculatorTest.java"
+./gradlew run --args="-t src/test/resources/CalculatorTest.java"
 ```
 
 Output:
@@ -101,7 +106,7 @@ Test Method: testMultiplication
 ### Example 2: Analyze a specific test method
 
 ```bash
-./gradlew run --args="src/test/resources/CalculatorTest.java testAddition"
+./gradlew run --args="-t src/test/resources/CalculatorTest.java -m testAddition"
 ```
 
 Output:
