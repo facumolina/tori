@@ -126,19 +126,14 @@ public class CheckedVarsMetric implements Metric {
     private void findUsedIdentifiers(TSNode node, String sourceCode, Set<String> variables) {
         String nodeType = node.getType();
         
-        // Add identifiers that are not part of method invocations (method names)
+        // Add identifiers that are variable references (not method names)
         if ("identifier".equals(nodeType)) {
             TSNode parent = node.getParent();
-            if (parent != null) {
-                String parentType = parent.getType();
-                // Skip if this identifier is a method name in a method invocation
-                if (!"method_invocation".equals(parentType) || 
-                    (parent.getChildCount() > 0 && parent.getChild(0) != node)) {
-                    int startByte = node.getStartByte();
-                    int endByte = node.getEndByte();
-                    String varName = sourceCode.substring(startByte, endByte);
-                    variables.add(varName);
-                }
+            if (parent != null && isVariableReference(node, parent)) {
+                int startByte = node.getStartByte();
+                int endByte = node.getEndByte();
+                String varName = sourceCode.substring(startByte, endByte);
+                variables.add(varName);
             }
         }
         
@@ -148,5 +143,28 @@ public class CheckedVarsMetric implements Metric {
             TSNode child = node.getChild(i);
             findUsedIdentifiers(child, sourceCode, variables);
         }
+    }
+
+    /**
+     * Determines if an identifier node represents a variable reference rather than a method name.
+     * An identifier is considered a variable reference if:
+     * - It is not part of a method invocation, OR
+     * - It is part of a method invocation but not the first child (i.e., it's an argument or object reference)
+     *
+     * @param identifierNode The identifier node to check
+     * @param parent The parent node of the identifier
+     * @return true if the identifier is a variable reference, false if it's a method name
+     */
+    private boolean isVariableReference(TSNode identifierNode, TSNode parent) {
+        String parentType = parent.getType();
+        
+        // If parent is not a method invocation, this is definitely a variable reference
+        if (!"method_invocation".equals(parentType)) {
+            return true;
+        }
+        
+        // If parent is a method invocation, check if this identifier is the method name (first child)
+        // or part of the arguments/object reference (not first child)
+        return parent.getChildCount() > 0 && parent.getChild(0) != identifierNode;
     }
 }

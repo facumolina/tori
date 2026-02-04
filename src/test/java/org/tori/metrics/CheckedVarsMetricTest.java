@@ -55,13 +55,13 @@ class CheckedVarsMetricTest {
             public void testExample() {
                 Calculator calc = new Calculator();
                 int result = calc.add(2, 3);
-                assertNotNull(calc);
+                assertTrue(calc != null && result > 0);
             }
             """;
-        String oracle = "assertNotNull(calc);";
+        String oracle = "assertTrue(calc != null && result > 0);";
         
         double score = metric.assess(testCase, oracle);
-        assertEquals(0.5, score, 0.01, "Should be 0.5 when 1 out of 2 variables is checked");
+        assertEquals(1.0, score, 0.01, "Should be 1.0 when both variables are checked");
     }
 
     @Test

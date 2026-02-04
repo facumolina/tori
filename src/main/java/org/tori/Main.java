@@ -82,6 +82,16 @@ public class Main {
                 } catch (ClassNotFoundException e) {
                     System.err.println("Error: Metric class not found: " + metricClassName);
                     System.exit(1);
+                } catch (ClassCastException e) {
+                    System.err.println("Error: Class does not implement org.tori.metrics.Metric: " + metricClassName);
+                    System.exit(1);
+                } catch (NoSuchMethodException e) {
+                    System.err.println("Error: Metric class must have a public no-argument constructor: " + metricClassName);
+                    System.exit(1);
+                } catch (InstantiationException | IllegalAccessException e) {
+                    System.err.println("Error: Cannot instantiate metric class: " + metricClassName);
+                    System.err.println("  Ensure the class is concrete and has a public no-argument constructor");
+                    System.exit(1);
                 } catch (Exception e) {
                     System.err.println("Error: Failed to instantiate metric: " + e.getMessage());
                     System.exit(1);
