@@ -35,7 +35,7 @@ public class Main {
         // Parse command-line arguments
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
-        CommandLine cmd;
+        CommandLine cmd = null;
 
         try {
             cmd = parser.parse(options, args);
@@ -44,7 +44,6 @@ public class Main {
             System.err.println();
             formatter.printHelp("tori", options);
             System.exit(1);
-            return;
         }
 
         String testFilePath = cmd.getOptionValue("t");
