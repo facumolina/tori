@@ -141,10 +141,9 @@ public class StateFieldCoverage implements Metric {
         
         Set<String> fields = new HashSet<>();
         
-        // Try to find the class file in src/test/resources
+        // Try to find the class file in src/test/resources (relative path)
         String[] possiblePaths = {
-            "src/test/resources/" + className + ".java",
-            "/home/runner/work/tori/tori/src/test/resources/" + className + ".java"
+            "src/test/resources/" + className + ".java"
         };
         
         for (String pathStr : possiblePaths) {
@@ -313,10 +312,9 @@ public class StateFieldCoverage implements Metric {
         
         Set<String> accessedFields = new HashSet<>();
         
-        // Try to find the class file
+        // Try to find the class file (relative path)
         String[] possiblePaths = {
-            "src/test/resources/" + className + ".java",
-            "/home/runner/work/tori/tori/src/test/resources/" + className + ".java"
+            "src/test/resources/" + className + ".java"
         };
         
         for (String pathStr : possiblePaths) {
