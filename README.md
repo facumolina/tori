@@ -7,7 +7,7 @@ Tori is a command-line tool that uses Tree-sitter to parse JUnit test suites and
 
 ## Requirements
 
-- Java 21 or higher
+- Java 17 or higher
 - Gradle 8.5 or higher (included via Gradle Wrapper)
 
 ## Building the Project
