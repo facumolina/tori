@@ -34,6 +34,11 @@ public class StateFieldCoverage implements Metric {
     private Set<String> lastAccessedFields;
     private boolean detailedReportingEnabled;
     
+    // Iterable field tracking
+    private boolean iterableFieldTrackingEnabled;
+    private final Map<String, Set<String>> iterableFieldsCache; // Maps class path to iterable field FQNs
+    private final Map<String, Set<String>> methodIterationCache; // Maps classPath.methodName to iterated field FQNs
+    
     public StateFieldCoverage() {
         this.javaLanguage = new TreeSitterJava();
         this.parser = new TSParser();
@@ -45,6 +50,9 @@ public class StateFieldCoverage implements Metric {
         this.lastTargetFields = new HashSet<>();
         this.lastAccessedFields = new HashSet<>();
         this.detailedReportingEnabled = true;
+        this.iterableFieldTrackingEnabled = true; // Enabled by default
+        this.iterableFieldsCache = new HashMap<>();
+        this.methodIterationCache = new HashMap<>();
     }
     
     /**
@@ -66,12 +74,19 @@ public class StateFieldCoverage implements Metric {
             this.executionLevel = ExecutionLevel.fromConfigValue(execLevelValue);
         }
         
+        // Configure iterable field tracking
+        String iterableTrackingValue = config.getProperty("iterable_field_tracking");
+        if (iterableTrackingValue != null && !iterableTrackingValue.isEmpty()) {
+            this.iterableFieldTrackingEnabled = Boolean.parseBoolean(iterableTrackingValue);
+        }
+        
         // Print target field information when configured
         if (detailedReportingEnabled) {
             Set<String> allFields = getAllFieldsInClass(targetClassPath);
             System.out.println("Target class: " + targetClassPath);
             System.out.println("Total target fields: " + allFields.size() + " " + allFields);
             System.out.println("Execution level: " + executionLevel.getConfigValue());
+            System.out.println("Iterable field tracking: " + (iterableFieldTrackingEnabled ? "enabled" : "disabled"));
             System.out.println();
         }
     }
@@ -279,6 +294,8 @@ public class StateFieldCoverage implements Metric {
     
     /**
      * Get all fields defined in a class, including fields from inner classes.
+     * If iterable field tracking is enabled, this includes both normal labels and
+     * special labels (with '+' suffix) for iterable fields.
      */
     private Set<String> getAllFieldsInClass(String classPath) {
         if (classFieldsCache.containsKey(classPath)) {
@@ -292,6 +309,17 @@ public class StateFieldCoverage implements Metric {
             try {
                 String classSource = Files.readString(path);
                 fields = extractFieldsFromClass(classSource);
+                
+                // If iterable field tracking is enabled, add special labels for iterable fields
+                if (iterableFieldTrackingEnabled) {
+                    Set<String> iterableFields = identifyIterableFields(classPath, classSource, fields);
+                    iterableFieldsCache.put(classPath, iterableFields);
+                    
+                    // Add special labels (field+) for iterable fields
+                    for (String iterableField : iterableFields) {
+                        fields.add(iterableField + "+");
+                    }
+                }
             } catch (IOException e) {
                 // Failed to read class file
             }
@@ -592,6 +620,7 @@ public class StateFieldCoverage implements Metric {
      * Extract fields accessed by ALL methods with the given name.
      * This handles cases where multiple classes have methods with the same name.
      * Prefers methods in outer classes over inner classes when possible.
+     * Also detects when fields are iterated over (for special + labels).
      */
     private Set<String> extractFieldAccessFromAllMethodsNamed(String classSource, String methodName) {
         Set<String> allAccessedFields = new HashSet<>();
@@ -634,6 +663,15 @@ public class StateFieldCoverage implements Metric {
             Set<String> methodFields = new HashSet<>();
             findFieldAccessesInMethod(methodContext.methodNode, classSource, methodFields, shortNameToFQN, localVars);
             allAccessedFields.addAll(methodFields);
+            
+            // If iterable field tracking is enabled, detect iterated fields
+            if (iterableFieldTrackingEnabled) {
+                Set<String> iteratedFields = findIteratedFields(methodContext.methodNode, classSource, shortNameToFQN, localVars);
+                // Add special labels for iterated fields
+                for (String iteratedField : iteratedFields) {
+                    allAccessedFields.add(iteratedField + "+");
+                }
+            }
         }
         
         return allAccessedFields;
@@ -972,5 +1010,322 @@ public class StateFieldCoverage implements Metric {
     private boolean isMethodName(TSNode identifierNode, TSNode parent) {
         String parentType = parent.getType();
         return "method_invocation".equals(parentType) || "method_declaration".equals(parentType);
+    }
+    
+    /**
+     * Identify iterable fields in a class. A field is iterable if:
+     * 1. Its type is a collection (array, List, Set, etc.)
+     * 2. It's a recursive field (field from a class to itself)
+     * 3. It's in a class that contains at least one recursive field (e.g., item/value in Node)
+     */
+    private Set<String> identifyIterableFields(String classPath, String classSource, Set<String> allFields) {
+        Set<String> iterableFields = new HashSet<>();
+        
+        TSTree tree = parser.parseString(null, classSource);
+        TSNode rootNode = tree.getRootNode();
+        
+        // Extract package name
+        String packageName = extractPackageName(rootNode, classSource);
+        
+        // Build field type information
+        Map<String, String> fieldTypes = extractFieldTypes(rootNode, classSource, packageName, "");
+        
+        // Identify recursive fields and classes with recursive fields
+        Set<String> recursiveFields = new HashSet<>();
+        Set<String> classesWithRecursiveFields = new HashSet<>();
+        
+        for (Map.Entry<String, String> entry : fieldTypes.entrySet()) {
+            String fieldFQN = entry.getKey();
+            String fieldType = entry.getValue();
+            
+            // Check if field is recursive (type matches its containing class)
+            if (isRecursiveField(fieldFQN, fieldType)) {
+                recursiveFields.add(fieldFQN);
+                String classContext = extractClassContextFromFieldFQN(fieldFQN);
+                classesWithRecursiveFields.add(classContext);
+            }
+        }
+        
+        // Classify fields as iterable
+        for (Map.Entry<String, String> entry : fieldTypes.entrySet()) {
+            String fieldFQN = entry.getKey();
+            String fieldType = entry.getValue();
+            
+            // Check if field is a collection type
+            if (isCollectionType(fieldType)) {
+                iterableFields.add(fieldFQN);
+            }
+            // Check if field is recursive
+            else if (recursiveFields.contains(fieldFQN)) {
+                iterableFields.add(fieldFQN);
+            }
+            // Check if field is in a class with recursive fields
+            else {
+                String classContext = extractClassContextFromFieldFQN(fieldFQN);
+                if (classesWithRecursiveFields.contains(classContext)) {
+                    iterableFields.add(fieldFQN);
+                }
+            }
+        }
+        
+        return iterableFields;
+    }
+    
+    /**
+     * Extract field types from the AST.
+     * Returns a map from field FQN to field type name.
+     */
+    private Map<String, String> extractFieldTypes(TSNode node, String sourceCode, String packageName, String classContext) {
+        Map<String, String> fieldTypes = new HashMap<>();
+        String nodeType = node.getType();
+        
+        if ("class_declaration".equals(nodeType)) {
+            TSNode nameNode = node.getChildByFieldName("name");
+            if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                int startByte = nameNode.getStartByte();
+                int endByte = nameNode.getEndByte();
+                String className = sourceCode.substring(startByte, endByte);
+                
+                String newClassContext = classContext.isEmpty() ? 
+                    (packageName.isEmpty() ? className : packageName + "." + className) :
+                    classContext + "." + className;
+                
+                // Process fields in this class
+                int childCount = node.getChildCount();
+                for (int i = 0; i < childCount; i++) {
+                    TSNode child = node.getChild(i);
+                    if ("class_body".equals(child.getType())) {
+                        fieldTypes.putAll(extractFieldTypes(child, sourceCode, packageName, newClassContext));
+                    }
+                }
+            }
+            return fieldTypes;
+        } else if ("field_declaration".equals(nodeType)) {
+            // Extract field type and name
+            TSNode typeNode = null;
+            List<String> fieldNames = new ArrayList<>();
+            
+            int childCount = node.getChildCount();
+            for (int i = 0; i < childCount; i++) {
+                TSNode child = node.getChild(i);
+                String childType = child.getType();
+                
+                if ("type_identifier".equals(childType) || "array_type".equals(childType) || 
+                    "generic_type".equals(childType) || "integral_type".equals(childType) ||
+                    "floating_point_type".equals(childType) || "boolean_type".equals(childType)) {
+                    typeNode = child;
+                } else if ("variable_declarator".equals(childType)) {
+                    TSNode identifier = child.getChild(0);
+                    if (identifier != null && "identifier".equals(identifier.getType())) {
+                        int startByte = identifier.getStartByte();
+                        int endByte = identifier.getEndByte();
+                        fieldNames.add(sourceCode.substring(startByte, endByte));
+                    }
+                }
+            }
+            
+            if (typeNode != null && !classContext.isEmpty()) {
+                String typeName = extractTypeName(typeNode, sourceCode);
+                for (String fieldName : fieldNames) {
+                    // classContext already includes package name, so don't prepend it again
+                    String fqn = classContext + "." + fieldName;
+                    fieldTypes.put(fqn, typeName);
+                }
+            }
+            return fieldTypes;
+        }
+        
+        // Recursively process children
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            fieldTypes.putAll(extractFieldTypes(child, sourceCode, packageName, classContext));
+        }
+        
+        return fieldTypes;
+    }
+    
+    /**
+     * Extract the type name from a type node.
+     */
+    private String extractTypeName(TSNode typeNode, String sourceCode) {
+        if ("type_identifier".equals(typeNode.getType())) {
+            int startByte = typeNode.getStartByte();
+            int endByte = typeNode.getEndByte();
+            return sourceCode.substring(startByte, endByte);
+        } else if ("array_type".equals(typeNode.getType())) {
+            // For arrays, get the element type
+            TSNode elementType = typeNode.getChild(0);
+            if (elementType != null) {
+                return extractTypeName(elementType, sourceCode) + "[]";
+            }
+        } else if ("generic_type".equals(typeNode.getType())) {
+            TSNode identifier = typeNode.getChild(0);
+            if (identifier != null && "type_identifier".equals(identifier.getType())) {
+                int startByte = identifier.getStartByte();
+                int endByte = identifier.getEndByte();
+                return sourceCode.substring(startByte, endByte);
+            }
+        }
+        
+        // For primitive types, return the text directly
+        int startByte = typeNode.getStartByte();
+        int endByte = typeNode.getEndByte();
+        return sourceCode.substring(startByte, endByte);
+    }
+    
+    /**
+     * Check if a field is recursive (its type matches its containing class name).
+     */
+    private boolean isRecursiveField(String fieldFQN, String fieldType) {
+        String classContext = extractClassContextFromFieldFQN(fieldFQN);
+        if (classContext.isEmpty()) {
+            return false;
+        }
+        
+        // Get the simple class name (last part)
+        String simpleClassName = classContext.substring(classContext.lastIndexOf('.') + 1);
+        
+        // Check if the field type matches the class name
+        return fieldType.equals(simpleClassName);
+    }
+    
+    /**
+     * Extract the class context from a field FQN.
+     * E.g., "com.example.IntsList.Node.next" -> "com.example.IntsList.Node"
+     */
+    private String extractClassContextFromFieldFQN(String fieldFQN) {
+        int lastDot = fieldFQN.lastIndexOf('.');
+        if (lastDot > 0) {
+            return fieldFQN.substring(0, lastDot);
+        }
+        return "";
+    }
+    
+    /**
+     * Check if a type is a collection type (array, List, Set, Collection, etc.).
+     */
+    private boolean isCollectionType(String typeName) {
+        if (typeName == null || typeName.isEmpty()) {
+            return false;
+        }
+        
+        // Check for array types
+        if (typeName.endsWith("[]")) {
+            return true;
+        }
+        
+        // Check for common collection types
+        return typeName.equals("List") || typeName.equals("Set") || 
+               typeName.equals("Collection") || typeName.equals("ArrayList") ||
+               typeName.equals("LinkedList") || typeName.equals("HashSet") ||
+               typeName.equals("TreeSet") || typeName.equals("Vector") ||
+               typeName.equals("Stack") || typeName.equals("Queue") ||
+               typeName.equals("Deque") || typeName.equals("Map") ||
+               typeName.equals("HashMap") || typeName.equals("TreeMap");
+    }
+    
+    /**
+     * Find fields that are iterated over in a method.
+     * A field is considered iterated if it's accessed within a loop or in a recursive method call.
+     */
+    private Set<String> findIteratedFields(TSNode methodNode, String sourceCode, 
+                                          Map<String, Set<String>> shortNameToFQN, Set<String> localVars) {
+        Set<String> iteratedFields = new HashSet<>();
+        
+        // Find fields accessed in loops
+        findFieldsInLoops(methodNode, sourceCode, iteratedFields, shortNameToFQN, localVars);
+        
+        // Find fields accessed in recursive method calls
+        // (methods that call themselves directly or indirectly)
+        findFieldsInRecursiveCalls(methodNode, sourceCode, iteratedFields, shortNameToFQN, localVars);
+        
+        return iteratedFields;
+    }
+    
+    /**
+     * Find fields accessed within loop statements (while, for, enhanced-for).
+     */
+    private void findFieldsInLoops(TSNode node, String sourceCode, Set<String> iteratedFields,
+                                   Map<String, Set<String>> shortNameToFQN, Set<String> localVars) {
+        String nodeType = node.getType();
+        
+        // Check if this is a loop node
+        if ("while_statement".equals(nodeType) || "for_statement".equals(nodeType) || 
+            "enhanced_for_statement".equals(nodeType) || "do_statement".equals(nodeType)) {
+            // Find all field accesses within this loop
+            Set<String> fieldsInLoop = new HashSet<>();
+            findFieldAccessesInMethod(node, sourceCode, fieldsInLoop, shortNameToFQN, localVars);
+            iteratedFields.addAll(fieldsInLoop);
+        }
+        
+        // Recursively process children
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            findFieldsInLoops(child, sourceCode, iteratedFields, shortNameToFQN, localVars);
+        }
+    }
+    
+    /**
+     * Find fields accessed in recursive method calls.
+     * Detects methods that call themselves (direct recursion).
+     */
+    private void findFieldsInRecursiveCalls(TSNode methodNode, String sourceCode, Set<String> iteratedFields,
+                                            Map<String, Set<String>> shortNameToFQN, Set<String> localVars) {
+        // Get the method name
+        TSNode nameNode = methodNode.getChildByFieldName("name");
+        if (nameNode == null || !"identifier".equals(nameNode.getType())) {
+            return;
+        }
+        
+        int startByte = nameNode.getStartByte();
+        int endByte = nameNode.getEndByte();
+        String methodName = sourceCode.substring(startByte, endByte);
+        
+        // Check if the method calls itself
+        if (methodCallsItself(methodNode, sourceCode, methodName)) {
+            // If the method is recursive, all fields it accesses are considered iterated
+            Set<String> fieldsInMethod = new HashSet<>();
+            findFieldAccessesInMethod(methodNode, sourceCode, fieldsInMethod, shortNameToFQN, localVars);
+            iteratedFields.addAll(fieldsInMethod);
+        }
+    }
+    
+    /**
+     * Check if a method calls itself (direct recursion).
+     */
+    private boolean methodCallsItself(TSNode methodNode, String sourceCode, String methodName) {
+        return containsMethodCall(methodNode, sourceCode, methodName);
+    }
+    
+    /**
+     * Check if a node contains a method invocation with the given name.
+     */
+    private boolean containsMethodCall(TSNode node, String sourceCode, String methodName) {
+        String nodeType = node.getType();
+        
+        if ("method_invocation".equals(nodeType)) {
+            TSNode nameNode = node.getChildByFieldName("name");
+            if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                int startByte = nameNode.getStartByte();
+                int endByte = nameNode.getEndByte();
+                String name = sourceCode.substring(startByte, endByte);
+                if (methodName.equals(name)) {
+                    return true;
+                }
+            }
+        }
+        
+        // Recursively check children
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            if (containsMethodCall(child, sourceCode, methodName)) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 }
