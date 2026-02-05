@@ -129,6 +129,12 @@ public class Main {
                             config.load(fis);
                         }
                         metric.configure(config);
+                        
+                        // Validate execution level constraints
+                        if (metric.getExecutionLevel() == org.tori.metrics.ExecutionLevel.TEST_CLASS && testMethodName != null) {
+                            System.err.println("Error: exec_level 'test_class' is not allowed when a specific test method is specified");
+                            System.exit(1);
+                        }
                     }
                 } catch (ClassNotFoundException e) {
                     System.err.println("Error: Metric class not found: " + metricClassName);
@@ -157,30 +163,80 @@ public class Main {
                     System.out.println("No test methods with assertions found.");
                 }
             } else {
-                for (MethodOracles methodOracles : results) {
-                    System.out.println("Test Method: " + methodOracles.methodName());
-                    if (methodOracles.oracles().isEmpty()) {
-                        System.out.println("  No assertions found");
-                    } else {
-                        for (String oracle : methodOracles.oracles()) {
-                            if (metric != null) {
-                                double score = metric.assess(methodOracles.testCaseSource(), oracle);
-                                System.out.print("  - " + oracle + " [score: " + String.format("%.2f", score));
-                                
-                                // If the metric is StateFieldCoverage, print detailed field information
-                                if (metric instanceof org.tori.metrics.StateFieldCoverage) {
-                                    org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
-                                    java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
-                                    System.out.print(", accessed fields: " + accessedFields.size() + " " + accessedFields);
-                                }
-                                
-                                System.out.println("]");
-                            } else {
-                                System.out.println("  - " + oracle);
-                            }
+                // Check execution level and print accordingly
+                if (metric != null && metric.getExecutionLevel() == org.tori.metrics.ExecutionLevel.TEST_CLASS) {
+                    // TEST_CLASS level: compute metric for all assertions in all methods
+                    java.util.List<String> allOracles = new java.util.ArrayList<>();
+                    StringBuilder allTestCases = new StringBuilder();
+                    
+                    for (MethodOracles methodOracles : results) {
+                        allOracles.addAll(methodOracles.oracles());
+                        allTestCases.append(methodOracles.testCaseSource()).append("\n");
+                    }
+                    
+                    if (!allOracles.isEmpty()) {
+                        double score = metric.assessMultiple(allTestCases.toString(), allOracles);
+                        System.out.println("Test Class Assessment:");
+                        System.out.print("  All assertions [score: " + String.format("%.2f", score));
+                        
+                        if (metric instanceof org.tori.metrics.StateFieldCoverage) {
+                            org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
+                            java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
+                            System.out.print(", accessed fields: " + accessedFields.size() + " " + accessedFields);
                         }
+                        
+                        System.out.println("]");
+                        System.out.println("  Total assertions: " + allOracles.size());
                     }
                     System.out.println();
+                } else if (metric != null && metric.getExecutionLevel() == org.tori.metrics.ExecutionLevel.TEST_METHOD) {
+                    // TEST_METHOD level: compute metric per method for all assertions in that method
+                    for (MethodOracles methodOracles : results) {
+                        System.out.println("Test Method: " + methodOracles.methodName());
+                        if (methodOracles.oracles().isEmpty()) {
+                            System.out.println("  No assertions found");
+                        } else {
+                            double score = metric.assessMultiple(methodOracles.testCaseSource(), methodOracles.oracles());
+                            System.out.print("  All assertions [score: " + String.format("%.2f", score));
+                            
+                            if (metric instanceof org.tori.metrics.StateFieldCoverage) {
+                                org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
+                                java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
+                                System.out.print(", accessed fields: " + accessedFields.size() + " " + accessedFields);
+                            }
+                            
+                            System.out.println("]");
+                            System.out.println("  Total assertions: " + methodOracles.oracles().size());
+                        }
+                        System.out.println();
+                    }
+                } else {
+                    // ASSERT level (default): compute metric per assertion
+                    for (MethodOracles methodOracles : results) {
+                        System.out.println("Test Method: " + methodOracles.methodName());
+                        if (methodOracles.oracles().isEmpty()) {
+                            System.out.println("  No assertions found");
+                        } else {
+                            for (String oracle : methodOracles.oracles()) {
+                                if (metric != null) {
+                                    double score = metric.assess(methodOracles.testCaseSource(), oracle);
+                                    System.out.print("  - " + oracle + " [score: " + String.format("%.2f", score));
+                                    
+                                    // If the metric is StateFieldCoverage, print detailed field information
+                                    if (metric instanceof org.tori.metrics.StateFieldCoverage) {
+                                        org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
+                                        java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
+                                        System.out.print(", accessed fields: " + accessedFields.size() + " " + accessedFields);
+                                    }
+                                    
+                                    System.out.println("]");
+                                } else {
+                                    System.out.println("  - " + oracle);
+                                }
+                            }
+                        }
+                        System.out.println();
+                    }
                 }
             }
         } catch (IOException e) {
