@@ -2,11 +2,13 @@ package org.tori;
 
 import org.apache.commons.cli.*;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Properties;
 
 public class Main {
     public static void main(String[] args) {
@@ -37,9 +39,18 @@ public class Main {
                 .argName("METRIC_CLASS")
                 .build();
         
+        Option metricConfigOption = Option.builder("mc")
+                .longOpt("metric-config")
+                .hasArg()
+                .required(false)
+                .desc("Path to the properties file with metric configuration (optional)")
+                .argName("CONFIG_FILE")
+                .build();
+        
         options.addOption(testFileOption);
         options.addOption(testMethodOption);
         options.addOption(metricOption);
+        options.addOption(metricConfigOption);
 
         // Parse command-line arguments
         CommandLineParser parser = new DefaultParser();
@@ -58,6 +69,7 @@ public class Main {
         String testFilePath = cmd.getOptionValue("t");
         String testMethodName = cmd.getOptionValue("m");
         String metricClassName = cmd.getOptionValue("metric");
+        String metricConfigPath = cmd.getOptionValue("metric-config");
 
         try {
             // Read the test file
@@ -79,6 +91,21 @@ public class Main {
                 try {
                     Class<?> metricClass = Class.forName(metricClassName);
                     metric = (org.tori.metrics.Metric) metricClass.getDeclaredConstructor().newInstance();
+                    
+                    // Load metric configuration if provided
+                    if (metricConfigPath != null) {
+                        Path configPath = Paths.get(metricConfigPath);
+                        if (!Files.exists(configPath)) {
+                            System.err.println("Error: Metric config file not found: " + metricConfigPath);
+                            System.exit(1);
+                        }
+                        
+                        Properties config = new Properties();
+                        try (FileInputStream fis = new FileInputStream(configPath.toFile())) {
+                            config.load(fis);
+                        }
+                        metric.configure(config);
+                    }
                 } catch (ClassNotFoundException e) {
                     System.err.println("Error: Metric class not found: " + metricClassName);
                     System.exit(1);
