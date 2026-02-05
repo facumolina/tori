@@ -180,10 +180,6 @@ class CheckedVarsMetricExecutionLevelTest {
             }
             """;
         
-        // Note: 'b' from test1 is not accessible in test3, so each method has its own scope
-        // We have: a, b from test1; c, d from test2; e, b from test3
-        // But 'b' in test3 is a different variable than 'b' in test1
-        // So we have 6 total variables: a, b(test1), c, d, e, b(test3)
         List<String> oracles = Arrays.asList(
             "assertEquals(5, a);",
             "assertTrue(c > 0 && d > 0);",
@@ -192,14 +188,7 @@ class CheckedVarsMetricExecutionLevelTest {
         );
         
         double score = metric.assessMultiple(testCase, oracles);
-        // This test checks the union across methods
-        // Variables: a, b (from test1), c, d (from test2), e, b (from test3) - but they're in different scopes
-        // Actually, each test method has its own scope, so we have:
-        // test1: a (checked), b (not checked) = 1/2
-        // test2: c (checked), d (checked) = 2/2
-        // test3: e (checked), b (checked) = 2/2
-        // Total: a, b, c, d, e, b = 6 variables, 5 unique names checked: a, b, c, d, e
-        // But since they're in the same test case string, the parser sees them all together
+        // Union of checked variables across all methods should achieve good coverage
         assertTrue(score >= 0.67, "Test class level should achieve good coverage");
     }
 
