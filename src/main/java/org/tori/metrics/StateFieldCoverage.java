@@ -127,6 +127,9 @@ public class StateFieldCoverage implements Metric {
     
     /**
      * Enable or disable detailed reporting in the configure method.
+     * This method should be called before configure() to prevent printing
+     * during configuration. If called after configure(), it will only affect
+     * future calls to configure() but not the current configuration's output.
      * 
      * @param enabled true to enable detailed reporting, false to disable
      */
