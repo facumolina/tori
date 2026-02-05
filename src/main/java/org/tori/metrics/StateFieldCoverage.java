@@ -614,10 +614,7 @@ public class StateFieldCoverage implements Metric {
             // Filter fields: include fields in the method's class AND its inner classes
             Set<String> relevantFields = new HashSet<>();
             for (String fqn : allFields) {
-                String prefix = methodContext.classContext + ".";
-                if (fqn.startsWith(prefix)) {
-                    // Include all fields that start with the class context
-                    // This includes fields directly in the class and in inner classes
+                if (isFieldInClassOrInnerClass(fqn, methodContext.classContext)) {
                     relevantFields.add(fqn);
                 }
             }
@@ -824,6 +821,20 @@ public class StateFieldCoverage implements Metric {
             return fqn.substring(lastDot + 1);
         }
         return fqn;
+    }
+    
+    /**
+     * Check if a field FQN belongs to a class or its inner classes.
+     * E.g., "com.example.Person.name" belongs to "com.example.Person"
+     * E.g., "com.example.Person.Address.name" belongs to "com.example.Person" (inner class)
+     * E.g., "com.example.PersonUtil.field" does NOT belong to "com.example.Person"
+     */
+    private boolean isFieldInClassOrInnerClass(String fieldFQN, String classContext) {
+        if (classContext.isEmpty()) {
+            return false;
+        }
+        String prefix = classContext + ".";
+        return fieldFQN.startsWith(prefix) && fieldFQN.length() > prefix.length();
     }
     
     /**
