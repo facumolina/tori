@@ -24,6 +24,7 @@ class StateFieldCoverageExecutionLevelTest {
         
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/IntsList.java");
+        config.setProperty("iterable_field_tracking", "false"); // Disable for existing tests
         metric.configure(config);
     }
 

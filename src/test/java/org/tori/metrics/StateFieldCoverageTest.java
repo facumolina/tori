@@ -29,6 +29,7 @@ class StateFieldCoverageTest {
         // Configure the metric with the target class path
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/IntsList.java");
+        config.setProperty("iterable_field_tracking", "false"); // Disable for existing tests
         metric.configure(config);
     }
 
@@ -179,5 +180,90 @@ class StateFieldCoverageTest {
         double score = metric.assess(testCase, oracle);
         // get method accesses size (in condition), header, next (in loop), and item (4 out of 4)
         assertEquals(1.0, score, 0.01, "Should be 1.0 when all fields (size, header, next, item) are accessed");
+    }
+    
+    @Test
+    void testAssess_IterableFieldTracking_CheckSize() {
+        // Test with iterable field tracking enabled
+        StateFieldCoverage iterableMetric = new StateFieldCoverage();
+        iterableMetric.setDetailedReportingEnabled(false);
+        
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/IntsList.java");
+        config.setProperty("iterable_field_tracking", "true"); // Enable iterable tracking
+        iterableMetric.configure(config);
+        
+        String testCase = """
+            @Test
+            public void testCheckSize() {
+                IntsList l = new IntsList();
+                l.add(1);
+                l.add(2);
+                l.add(3);
+                assertTrue(l.checkSize());
+            }
+            """;
+        String oracle = "assertTrue(l.checkSize());";
+        
+        double score = iterableMetric.assess(testCase, oracle);
+        
+        // checkSize method accesses:
+        // - header (regular access)
+        // - next (iterated in loop - should cover both next and next+)
+        // - size (regular access)
+        // Total target fields with iterable tracking: 6 (header, size, item, next, item+, next+)
+        // Fields accessed: header, size, next (in loop), next+ (iteration detected)
+        // So we should cover: header, size, next, next+ = 4/6 = 0.666...
+        
+        assertTrue(score > 0.5, "Score should be > 0.5 when checkSize accesses fields including iteration");
+        
+        // Verify that the right fields were accessed
+        var accessed = iterableMetric.getLastAccessedFields();
+        var target = iterableMetric.getLastTargetFields();
+        
+        // Target should include both regular and special labels for iterable fields
+        assertTrue(target.size() == 6, "Should have 6 target fields (4 regular + 2 special labels)");
+        
+        // Accessed should include special label for next (next+) since it's iterated
+        assertTrue(accessed.stream().anyMatch(f -> f.contains("next+")), 
+            "Should access next+ label (iterated field)");
+    }
+    
+    @Test
+    void testAssess_IterableFieldTracking_Disabled() {
+        // Verify that with iterable tracking disabled, we get the old behavior
+        StateFieldCoverage noIterableMetric = new StateFieldCoverage();
+        noIterableMetric.setDetailedReportingEnabled(false);
+        
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/IntsList.java");
+        config.setProperty("iterable_field_tracking", "false");
+        noIterableMetric.configure(config);
+        
+        String testCase = """
+            @Test
+            public void testCheckSize() {
+                IntsList l = new IntsList();
+                l.add(1);
+                l.add(2);
+                assertTrue(l.checkSize());
+            }
+            """;
+        String oracle = "assertTrue(l.checkSize());";
+        
+        double score = noIterableMetric.assess(testCase, oracle);
+        
+        // Without iterable tracking, checkSize accesses header, size, next
+        // Total: 4 fields (header, size, item, next)
+        // Accessed: 3 (header, size, next)
+        // Score: 3/4 = 0.75
+        assertEquals(0.75, score, 0.01, "Should be 0.75 when checkSize accesses 3 out of 4 fields");
+        
+        var target = noIterableMetric.getLastTargetFields();
+        assertEquals(4, target.size(), "Should have 4 target fields when iterable tracking is disabled");
+        
+        // Should not have any + labels
+        assertTrue(target.stream().noneMatch(f -> f.contains("+")), 
+            "Should not have any special + labels when iterable tracking is disabled");
     }
 }

@@ -91,4 +91,13 @@ public class IntsListTest {
         l.add(2);
         assertTrue(l.getHeader().item == 1 && l.getHeader().next != null && l.getSize() == 2 && l.getHeader().next.item == 2);
     }
+
+    @Test
+    public void testCheckSize() {
+        IntsList l = new IntsList();
+        l.add(1);
+        l.add(2);
+        l.add(3);
+        assertTrue(l.checkSize());
+    }
 }
