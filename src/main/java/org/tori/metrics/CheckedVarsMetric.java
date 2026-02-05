@@ -3,6 +3,8 @@ package org.tori.metrics;
 import org.treesitter.*;
 
 import java.util.HashSet;
+import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 
 /**
@@ -12,12 +14,28 @@ import java.util.Set;
 public class CheckedVarsMetric implements Metric {
     private final TSParser parser;
     private final TSLanguage javaLanguage;
+    private ExecutionLevel executionLevel;
 
     public CheckedVarsMetric() {
         // Initialize Tree-sitter parser for Java
         this.javaLanguage = new TreeSitterJava();
         this.parser = new TSParser();
         parser.setLanguage(javaLanguage);
+        this.executionLevel = ExecutionLevel.ASSERT;
+    }
+    
+    /**
+     * Configure the metric with properties.
+     * Expected property: exec_level - the execution level (assert, test_method, test_class)
+     * 
+     * @param config Properties object containing metric configuration
+     */
+    @Override
+    public void configure(Properties config) {
+        String execLevelValue = config.getProperty("exec_level");
+        if (execLevelValue != null && !execLevelValue.isEmpty()) {
+            this.executionLevel = ExecutionLevel.fromConfigValue(execLevelValue);
+        }
     }
 
     /**
@@ -166,5 +184,55 @@ public class CheckedVarsMetric implements Metric {
         // If parent is a method invocation, check if this identifier is the method name (first child)
         // or part of the arguments/object reference (not first child)
         return parent.getChildCount() > 0 && parent.getChild(0) != identifierNode;
+    }
+    
+    @Override
+    public ExecutionLevel getExecutionLevel() {
+        return executionLevel;
+    }
+    
+    @Override
+    public void setExecutionLevel(ExecutionLevel level) {
+        this.executionLevel = level;
+    }
+    
+    /**
+     * Assess multiple oracles at once, computing the union of checked variables.
+     * This is used for TEST_METHOD and TEST_CLASS execution levels.
+     * 
+     * @param testCase The full source code of the test case (method body or class)
+     * @param oracles List of oracle statements to assess
+     * @return The proportion of variables checked by any of the oracles (0.0 to 1.0)
+     */
+    @Override
+    public double assessMultiple(String testCase, List<String> oracles) {
+        if (oracles == null || oracles.isEmpty()) {
+            return 0.0;
+        }
+        
+        // Extract declared variables from test case
+        Set<String> declaredVars = extractDeclaredVariables(testCase);
+        
+        if (declaredVars.isEmpty()) {
+            return 0.0;
+        }
+        
+        // Compute the union of all variables checked by any oracle
+        Set<String> unionCheckedVars = new HashSet<>();
+        for (String oracle : oracles) {
+            Set<String> oracleVars = extractUsedVariables(oracle);
+            unionCheckedVars.addAll(oracleVars);
+        }
+        
+        // Count how many declared variables are checked
+        int checkedCount = 0;
+        for (String var : declaredVars) {
+            if (unionCheckedVars.contains(var)) {
+                checkedCount++;
+            }
+        }
+        
+        // Return the proportion
+        return (double) checkedCount / declaredVars.size();
     }
 }
