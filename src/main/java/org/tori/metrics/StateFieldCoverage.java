@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -302,6 +303,7 @@ public class StateFieldCoverage implements Metric {
     
     /**
      * Extract all field names from a class, including inner classes.
+     * Fields are stored as fully qualified names: package.class.field_name
      */
     private Set<String> extractFieldsFromClass(String classSource) {
         Set<String> fields = new HashSet<>();
@@ -309,7 +311,11 @@ public class StateFieldCoverage implements Metric {
         TSTree tree = parser.parseString(null, classSource);
         TSNode rootNode = tree.getRootNode();
         
-        findFieldDeclarations(rootNode, classSource, fields);
+        // Extract package name
+        String packageName = extractPackageName(rootNode, classSource);
+        
+        // Find field declarations with class context
+        findFieldDeclarationsWithContext(rootNode, classSource, fields, packageName, "");
         
         return fields;
     }
@@ -342,6 +348,73 @@ public class StateFieldCoverage implements Metric {
     }
     
     /**
+     * Extract package name from the AST root node.
+     */
+    private String extractPackageName(TSNode rootNode, String sourceCode) {
+        int childCount = rootNode.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = rootNode.getChild(i);
+            if ("package_declaration".equals(child.getType())) {
+                // Find the identifier in the package declaration
+                int pkgChildCount = child.getChildCount();
+                for (int j = 0; j < pkgChildCount; j++) {
+                    TSNode pkgChild = child.getChild(j);
+                    if ("scoped_identifier".equals(pkgChild.getType()) || 
+                        "identifier".equals(pkgChild.getType())) {
+                        int startByte = pkgChild.getStartByte();
+                        int endByte = pkgChild.getEndByte();
+                        return sourceCode.substring(startByte, endByte);
+                    }
+                }
+            }
+        }
+        return "";
+    }
+    
+    /**
+     * Recursively find all field declarations with their class context.
+     * Fields are stored as fully qualified names: package.class.field_name
+     */
+    private void findFieldDeclarationsWithContext(TSNode node, String sourceCode, Set<String> fields, 
+                                                   String packageName, String classContext) {
+        String nodeType = node.getType();
+        
+        if ("class_declaration".equals(nodeType)) {
+            // Extract the class name
+            TSNode nameNode = node.getChildByFieldName("name");
+            if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                int startByte = nameNode.getStartByte();
+                int endByte = nameNode.getEndByte();
+                String className = sourceCode.substring(startByte, endByte);
+                
+                // Build the new class context
+                String newClassContext = classContext.isEmpty() ? className : classContext + "." + className;
+                
+                // Find the class body and process it - DON'T process children later
+                int childCount = node.getChildCount();
+                for (int i = 0; i < childCount; i++) {
+                    TSNode child = node.getChild(i);
+                    if ("class_body".equals(child.getType())) {
+                        findFieldDeclarationsWithContext(child, sourceCode, fields, packageName, newClassContext);
+                    }
+                }
+                return; // Important: don't process children again
+            }
+        } else if ("field_declaration".equals(nodeType)) {
+            // Extract field names with fully qualified prefix
+            extractFieldNamesWithContext(node, sourceCode, fields, packageName, classContext);
+            return; // Don't process children of field declarations
+        }
+        
+        // Recursively process children for non-class, non-field nodes
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            findFieldDeclarationsWithContext(child, sourceCode, fields, packageName, classContext);
+        }
+    }
+    
+    /**
      * Extract field names from a field declaration node.
      */
     private void extractFieldNames(TSNode declarationNode, String sourceCode, Set<String> fields) {
@@ -361,11 +434,39 @@ public class StateFieldCoverage implements Metric {
     }
     
     /**
+     * Extract field names from a field declaration node with fully qualified context.
+     * Stores fields as: package.class.field_name
+     */
+    private void extractFieldNamesWithContext(TSNode declarationNode, String sourceCode, Set<String> fields,
+                                              String packageName, String classContext) {
+        int childCount = declarationNode.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = declarationNode.getChild(i);
+            if ("variable_declarator".equals(child.getType())) {
+                TSNode identifier = child.getChild(0);
+                if (identifier != null && "identifier".equals(identifier.getType())) {
+                    int startByte = identifier.getStartByte();
+                    int endByte = identifier.getEndByte();
+                    String fieldName = sourceCode.substring(startByte, endByte);
+                    
+                    // Build fully qualified field name
+                    String fqn = packageName.isEmpty() ? classContext + "." + fieldName :
+                                packageName + "." + classContext + "." + fieldName;
+                    fields.add(fqn);
+                }
+            }
+        }
+    }
+    
+    /**
      * Get the fields accessed by an oracle statement.
      * This traces method calls to determine which fields are accessed.
      */
     private Set<String> getFieldsAccessedByOracle(String testCase, String oracle, String classPath) {
         Set<String> accessedFields = new HashSet<>();
+        
+        // Get all fields in the target class (with FQN)
+        Set<String> allFields = getAllFieldsInClass(classPath);
         
         TSTree tree = parser.parseString(null, oracle);
         TSNode rootNode = tree.getRootNode();
@@ -381,7 +482,7 @@ public class StateFieldCoverage implements Metric {
         }
         
         // Also check for direct field accesses in the oracle
-        findDirectFieldAccesses(rootNode, oracle, accessedFields);
+        findDirectFieldAccesses(rootNode, oracle, accessedFields, allFields);
         
         return accessedFields;
     }
@@ -413,8 +514,9 @@ public class StateFieldCoverage implements Metric {
     
     /**
      * Find direct field accesses in the oracle (e.g., obj.field).
+     * Maps short field names to their fully qualified names.
      */
-    private void findDirectFieldAccesses(TSNode node, String sourceCode, Set<String> fields) {
+    private void findDirectFieldAccesses(TSNode node, String sourceCode, Set<String> fields, Set<String> allFields) {
         String nodeType = node.getType();
         
         if ("field_access".equals(nodeType)) {
@@ -423,7 +525,12 @@ public class StateFieldCoverage implements Metric {
                 int startByte = fieldNode.getStartByte();
                 int endByte = fieldNode.getEndByte();
                 String fieldName = sourceCode.substring(startByte, endByte);
-                fields.add(fieldName);
+                
+                // Map short field name to FQN
+                String fqn = mapFieldNameToFQN(fieldName, allFields);
+                if (fqn != null) {
+                    fields.add(fqn);
+                }
             }
         }
         
@@ -431,13 +538,28 @@ public class StateFieldCoverage implements Metric {
         int childCount = node.getChildCount();
         for (int i = 0; i < childCount; i++) {
             TSNode child = node.getChild(i);
-            findDirectFieldAccesses(child, sourceCode, fields);
+            findDirectFieldAccesses(child, sourceCode, fields, allFields);
         }
+    }
+    
+    /**
+     * Map a short field name to its fully qualified name.
+     * If multiple FQNs match, returns the first one.
+     */
+    private String mapFieldNameToFQN(String shortName, Set<String> allFields) {
+        for (String fqn : allFields) {
+            if (fqn.endsWith("." + shortName)) {
+                return fqn;
+            }
+        }
+        return null;
     }
     
     /**
      * Get the fields accessed by a specific method in a class.
      * This analyzes the method body to determine which fields are accessed.
+     * If multiple methods with the same name exist (e.g., in different classes),
+     * we return the union of fields accessed by all of them.
      */
     private Set<String> getFieldsAccessedByMethod(String classPath, String methodName) {
         String cacheKey = classPath + "." + methodName;
@@ -453,7 +575,7 @@ public class StateFieldCoverage implements Metric {
         if (Files.exists(path)) {
             try {
                 String classSource = Files.readString(path);
-                accessedFields = extractFieldAccessFromMethod(classSource, methodName);
+                accessedFields = extractFieldAccessFromAllMethodsNamed(classSource, methodName);
             } catch (IOException e) {
                 // Failed to read class file
             }
@@ -467,7 +589,117 @@ public class StateFieldCoverage implements Metric {
     }
     
     /**
+     * Extract fields accessed by ALL methods with the given name.
+     * This handles cases where multiple classes have methods with the same name.
+     * Prefers methods in outer classes over inner classes when possible.
+     */
+    private Set<String> extractFieldAccessFromAllMethodsNamed(String classSource, String methodName) {
+        Set<String> allAccessedFields = new HashSet<>();
+        
+        TSTree tree = parser.parseString(null, classSource);
+        TSNode rootNode = tree.getRootNode();
+        
+        // Get all fields in the class with FQN
+        Set<String> allFields = extractFieldsFromClass(classSource);
+        
+        // Extract package name
+        String packageName = extractPackageName(rootNode, classSource);
+        
+        // Find ALL methods with this name and collect their accessed fields
+        List<MethodContext> methods = findAllMethodsWithClassContext(rootNode, classSource, methodName, packageName, "");
+        
+        // When we can't determine which specific method is called (no type inference),
+        // we conservatively include fields from all methods with that name
+        for (MethodContext methodContext : methods) {
+            // Filter fields: include fields in the method's class AND its inner classes
+            Set<String> relevantFields = new HashSet<>();
+            for (String fqn : allFields) {
+                String prefix = methodContext.classContext + ".";
+                if (fqn.startsWith(prefix)) {
+                    // Include all fields that start with the class context
+                    // This includes fields directly in the class and in inner classes
+                    relevantFields.add(fqn);
+                }
+            }
+            
+            // Create a mapping from short names to FQN for easier lookup
+            Map<String, Set<String>> shortNameToFQN = new HashMap<>();
+            for (String fqn : relevantFields) {
+                String shortName = extractShortFieldName(fqn);
+                shortNameToFQN.computeIfAbsent(shortName, k -> new HashSet<>()).add(fqn);
+            }
+            
+            // Get local variables declared in the method
+            Set<String> localVars = new HashSet<>();
+            findLocalVariables(methodContext.methodNode, classSource, localVars);
+            
+            // Find all identifier and field access nodes in the method
+            Set<String> methodFields = new HashSet<>();
+            findFieldAccessesInMethod(methodContext.methodNode, classSource, methodFields, shortNameToFQN, localVars);
+            allAccessedFields.addAll(methodFields);
+        }
+        
+        return allAccessedFields;
+    }
+    
+    /**
+     * Find ALL methods with the given name and their class contexts.
+     */
+    private List<MethodContext> findAllMethodsWithClassContext(TSNode node, String sourceCode, String methodName,
+                                                                String packageName, String classContext) {
+        List<MethodContext> methods = new ArrayList<>();
+        String nodeType = node.getType();
+        
+        if ("class_declaration".equals(nodeType)) {
+            TSNode nameNode = node.getChildByFieldName("name");
+            if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                int startByte = nameNode.getStartByte();
+                int endByte = nameNode.getEndByte();
+                String className = sourceCode.substring(startByte, endByte);
+                
+                String newClassContext = classContext.isEmpty() ? 
+                    (packageName.isEmpty() ? className : packageName + "." + className) :
+                    classContext + "." + className;
+                
+                // Search in this class
+                int childCount = node.getChildCount();
+                for (int i = 0; i < childCount; i++) {
+                    TSNode child = node.getChild(i);
+                    methods.addAll(findAllMethodsWithClassContext(child, sourceCode, methodName, 
+                                                                   packageName, newClassContext));
+                }
+            }
+            return methods; // Don't continue searching outside this class
+        } else if ("method_declaration".equals(nodeType)) {
+            // Only add methods that have a class context (i.e., we're inside a class)
+            if (!classContext.isEmpty()) {
+                TSNode nameNode = node.getChildByFieldName("name");
+                if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                    int startByte = nameNode.getStartByte();
+                    int endByte = nameNode.getEndByte();
+                    String name = sourceCode.substring(startByte, endByte);
+                    if (methodName.equals(name)) {
+                        methods.add(new MethodContext(node, classContext));
+                    }
+                }
+            }
+            return methods; // Don't search inside method declarations
+        }
+        
+        // Recursively search children
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            methods.addAll(findAllMethodsWithClassContext(child, sourceCode, methodName, 
+                                                          packageName, classContext));
+        }
+        
+        return methods;
+    }
+    
+    /**
      * Extract which fields are accessed by a specific method.
+     * Returns fields as fully qualified names.
      */
     private Set<String> extractFieldAccessFromMethod(String classSource, String methodName) {
         Set<String> accessedFields = new HashSet<>();
@@ -475,24 +707,123 @@ public class StateFieldCoverage implements Metric {
         TSTree tree = parser.parseString(null, classSource);
         TSNode rootNode = tree.getRootNode();
         
-        // First, get all fields in the class
-        Set<String> allFields = new HashSet<>();
-        findFieldDeclarations(rootNode, classSource, allFields);
+        // Get all fields in the class with FQN
+        Set<String> allFields = extractFieldsFromClass(classSource);
         
-        // Find the method declaration
-        TSNode methodNode = findMethodDeclaration(rootNode, classSource, methodName);
-        if (methodNode == null) {
+        // Extract package name
+        String packageName = extractPackageName(rootNode, classSource);
+        
+        // Find the method declaration and its containing class
+        MethodContext methodContext = findMethodWithClassContext(rootNode, classSource, methodName, packageName, "");
+        if (methodContext == null || methodContext.methodNode == null) {
             return accessedFields;
+        }
+        
+        // Filter fields to only those in the method's class (not inner classes)
+        Set<String> relevantFields = new HashSet<>();
+        for (String fqn : allFields) {
+            if (fqn.startsWith(methodContext.classContext + ".") && 
+                !fqn.substring(methodContext.classContext.length() + 1).contains(".")) {
+                // Field is directly in this class (not in an inner class)
+                relevantFields.add(fqn);
+            }
+        }
+        
+        // Create a mapping from short names to FQN for easier lookup
+        Map<String, Set<String>> shortNameToFQN = new HashMap<>();
+        for (String fqn : relevantFields) {
+            String shortName = extractShortFieldName(fqn);
+            shortNameToFQN.computeIfAbsent(shortName, k -> new HashSet<>()).add(fqn);
         }
         
         // Get local variables declared in the method
         Set<String> localVars = new HashSet<>();
-        findLocalVariables(methodNode, classSource, localVars);
+        findLocalVariables(methodContext.methodNode, classSource, localVars);
         
         // Find all identifier and field access nodes in the method
-        findFieldAccessesInMethod(methodNode, classSource, accessedFields, allFields, localVars);
+        findFieldAccessesInMethod(methodContext.methodNode, classSource, accessedFields, shortNameToFQN, localVars);
         
         return accessedFields;
+    }
+    
+    /**
+     * Context information for a method.
+     */
+    private static class MethodContext {
+        TSNode methodNode;
+        String classContext;
+        
+        MethodContext(TSNode methodNode, String classContext) {
+            this.methodNode = methodNode;
+            this.classContext = classContext;
+        }
+    }
+    
+    /**
+     * Find a method declaration with its class context.
+     */
+    private MethodContext findMethodWithClassContext(TSNode node, String sourceCode, String methodName,
+                                                      String packageName, String classContext) {
+        String nodeType = node.getType();
+        
+        if ("class_declaration".equals(nodeType)) {
+            TSNode nameNode = node.getChildByFieldName("name");
+            if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                int startByte = nameNode.getStartByte();
+                int endByte = nameNode.getEndByte();
+                String className = sourceCode.substring(startByte, endByte);
+                
+                String newClassContext = classContext.isEmpty() ? 
+                    (packageName.isEmpty() ? className : packageName + "." + className) :
+                    classContext + "." + className;
+                
+                // Search in this class
+                int childCount = node.getChildCount();
+                for (int i = 0; i < childCount; i++) {
+                    TSNode child = node.getChild(i);
+                    MethodContext result = findMethodWithClassContext(child, sourceCode, methodName, 
+                                                                      packageName, newClassContext);
+                    if (result != null) {
+                        return result;
+                    }
+                }
+            }
+        } else if ("method_declaration".equals(nodeType)) {
+            TSNode nameNode = node.getChildByFieldName("name");
+            if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                int startByte = nameNode.getStartByte();
+                int endByte = nameNode.getEndByte();
+                String name = sourceCode.substring(startByte, endByte);
+                if (methodName.equals(name)) {
+                    return new MethodContext(node, classContext);
+                }
+            }
+        }
+        
+        // Recursively search children
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            MethodContext result = findMethodWithClassContext(child, sourceCode, methodName, 
+                                                              packageName, classContext);
+            if (result != null) {
+                return result;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Extract the short field name from a fully qualified name.
+     * E.g., "com.example.IntsList.size" -> "size"
+     */
+    private String extractShortFieldName(String fqn) {
+        int lastDot = fqn.lastIndexOf('.');
+        if (lastDot >= 0 && lastDot < fqn.length() - 1) {
+            return fqn.substring(lastDot + 1);
+        }
+        return fqn;
     }
     
     /**
@@ -583,9 +914,10 @@ public class StateFieldCoverage implements Metric {
     /**
      * Find all field accesses within a method body.
      * This includes both explicit field accesses (obj.field) and implicit accesses (field).
+     * Maps short field names to their fully qualified names.
      */
     private void findFieldAccessesInMethod(TSNode node, String sourceCode, Set<String> accessedFields, 
-                                           Set<String> allFields, Set<String> localVars) {
+                                           Map<String, Set<String>> shortNameToFQN, Set<String> localVars) {
         String nodeType = node.getType();
         
         // Look for explicit field access patterns (obj.field)
@@ -595,9 +927,9 @@ public class StateFieldCoverage implements Metric {
                 int startByte = fieldNode.getStartByte();
                 int endByte = fieldNode.getEndByte();
                 String fieldName = sourceCode.substring(startByte, endByte);
-                // Only add if it's actually a field in the class
-                if (allFields.contains(fieldName)) {
-                    accessedFields.add(fieldName);
+                // Map short name to FQN and add all matching FQNs
+                if (shortNameToFQN.containsKey(fieldName)) {
+                    accessedFields.addAll(shortNameToFQN.get(fieldName));
                 }
             }
         } else if ("identifier".equals(nodeType)) {
@@ -608,9 +940,9 @@ public class StateFieldCoverage implements Metric {
                 int endByte = node.getEndByte();
                 String name = sourceCode.substring(startByte, endByte);
                 
-                // It's a field if it's in allFields and NOT in localVars
-                if (allFields.contains(name) && !localVars.contains(name)) {
-                    accessedFields.add(name);
+                // It's a field if it's in shortNameToFQN and NOT in localVars
+                if (shortNameToFQN.containsKey(name) && !localVars.contains(name)) {
+                    accessedFields.addAll(shortNameToFQN.get(name));
                 }
             }
         }
@@ -619,7 +951,7 @@ public class StateFieldCoverage implements Metric {
         int childCount = node.getChildCount();
         for (int i = 0; i < childCount; i++) {
             TSNode child = node.getChild(i);
-            findFieldAccessesInMethod(child, sourceCode, accessedFields, allFields, localVars);
+            findFieldAccessesInMethod(child, sourceCode, accessedFields, shortNameToFQN, localVars);
         }
     }
     
