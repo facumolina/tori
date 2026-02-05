@@ -11,7 +11,13 @@ import java.util.List;
 import java.util.Properties;
 
 public class Main {
+    private static final String VERSION = "1.0.0";
+    
     public static void main(String[] args) {
+        // Print banner
+        System.out.println("Tori " + VERSION + " - Test Oracle Inspector");
+        System.out.println();
+        
         // Define command-line options
         Options options = new Options();
         
@@ -70,6 +76,24 @@ public class Main {
         String testMethodName = cmd.getOptionValue("m");
         String metricClassName = cmd.getOptionValue("metric");
         String metricConfigPath = cmd.getOptionValue("metric-config");
+
+        // Print execution parameters
+        System.out.println("Execution Parameters:");
+        System.out.println("  Test file: " + testFilePath);
+        if (testMethodName != null) {
+            System.out.println("  Test method: " + testMethodName);
+        } else {
+            System.out.println("  Test method: all");
+        }
+        if (metricClassName != null) {
+            System.out.println("  Metric: " + metricClassName);
+            if (metricConfigPath != null) {
+                System.out.println("  Metric config: " + metricConfigPath);
+            }
+        } else {
+            System.out.println("  Metric: none");
+        }
+        System.out.println();
 
         try {
             // Read the test file
@@ -141,7 +165,16 @@ public class Main {
                         for (String oracle : methodOracles.oracles()) {
                             if (metric != null) {
                                 double score = metric.assess(methodOracles.testCaseSource(), oracle);
-                                System.out.println("  - " + oracle + " [score: " + String.format("%.2f", score) + "]");
+                                System.out.print("  - " + oracle + " [score: " + String.format("%.2f", score));
+                                
+                                // If the metric is StateFieldCoverage, print detailed field information
+                                if (metric instanceof org.tori.metrics.StateFieldCoverage) {
+                                    org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
+                                    java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
+                                    System.out.print(", accessed fields: " + accessedFields.size() + " " + accessedFields);
+                                }
+                                
+                                System.out.println("]");
                             } else {
                                 System.out.println("  - " + oracle);
                             }

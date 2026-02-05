@@ -28,6 +28,9 @@ class TestOracleInspectorTest_StateFieldCoverageTest {
         inspector = new TestOracleInspector();
         metric = new StateFieldCoverage();
         
+        // Disable detailed reporting for tests
+        metric.setDetailedReportingEnabled(false);
+        
         // Configure the metric with the target class
         Properties config = new Properties();
         try (InputStream configStream = getClass().getResourceAsStream("/state_field_coverage.properties")) {
@@ -136,6 +139,7 @@ class TestOracleInspectorTest_StateFieldCoverageTest {
         config.setProperty("target_class", "src/test/resources/IntsList.java");
         
         StateFieldCoverage testMetric = new StateFieldCoverage();
+        testMetric.setDetailedReportingEnabled(false);
         assertDoesNotThrow(() -> testMetric.configure(config), 
             "Should be able to configure metric with valid target_class");
     }
@@ -146,6 +150,7 @@ class TestOracleInspectorTest_StateFieldCoverageTest {
         Properties config = new Properties();
         
         StateFieldCoverage testMetric = new StateFieldCoverage();
+        testMetric.setDetailedReportingEnabled(false);
         assertThrows(IllegalArgumentException.class, () -> testMetric.configure(config), 
             "Should throw exception when target_class is missing");
     }
@@ -157,6 +162,7 @@ class TestOracleInspectorTest_StateFieldCoverageTest {
         config.setProperty("target_class", "");
         
         StateFieldCoverage testMetric = new StateFieldCoverage();
+        testMetric.setDetailedReportingEnabled(false);
         assertThrows(IllegalArgumentException.class, () -> testMetric.configure(config), 
             "Should throw exception when target_class is empty");
     }

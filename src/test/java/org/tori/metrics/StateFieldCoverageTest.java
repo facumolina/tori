@@ -23,6 +23,9 @@ class StateFieldCoverageTest {
     void setUp() {
         metric = new StateFieldCoverage();
         
+        // Disable detailed reporting for tests
+        metric.setDetailedReportingEnabled(false);
+        
         // Configure the metric with the target class path
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/IntsList.java");
