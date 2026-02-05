@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -25,6 +26,7 @@ public class StateFieldCoverage implements Metric {
     private final Map<String, Set<String>> classFieldsCache;
     private final Map<String, Map<String, Set<String>>> methodFieldAccessCache;
     private String targetClassPath;
+    private ExecutionLevel executionLevel;
     
     // Store detailed information for the last assessment
     private Set<String> lastTargetFields;
@@ -38,6 +40,7 @@ public class StateFieldCoverage implements Metric {
         this.classFieldsCache = new HashMap<>();
         this.methodFieldAccessCache = new HashMap<>();
         this.targetClassPath = null;
+        this.executionLevel = ExecutionLevel.ASSERT;
         this.lastTargetFields = new HashSet<>();
         this.lastAccessedFields = new HashSet<>();
         this.detailedReportingEnabled = true;
@@ -56,11 +59,18 @@ public class StateFieldCoverage implements Metric {
             throw new IllegalArgumentException("Configuration must contain 'target_class' property with the path to the target class");
         }
         
+        // Configure execution level
+        String execLevelValue = config.getProperty("exec_level");
+        if (execLevelValue != null && !execLevelValue.isEmpty()) {
+            this.executionLevel = ExecutionLevel.fromConfigValue(execLevelValue);
+        }
+        
         // Print target field information when configured
         if (detailedReportingEnabled) {
             Set<String> allFields = getAllFieldsInClass(targetClassPath);
             System.out.println("Target class: " + targetClassPath);
             System.out.println("Total target fields: " + allFields.size() + " " + allFields);
+            System.out.println("Execution level: " + executionLevel.getConfigValue());
             System.out.println();
         }
     }
@@ -135,6 +145,65 @@ public class StateFieldCoverage implements Metric {
      */
     public void setDetailedReportingEnabled(boolean enabled) {
         this.detailedReportingEnabled = enabled;
+    }
+    
+    @Override
+    public ExecutionLevel getExecutionLevel() {
+        return executionLevel;
+    }
+    
+    @Override
+    public void setExecutionLevel(ExecutionLevel level) {
+        this.executionLevel = level;
+    }
+    
+    /**
+     * Assess multiple oracles at once, computing the union of accessed fields.
+     * This is used for TEST_METHOD and TEST_CLASS execution levels.
+     * 
+     * @param testCase The full source code of the test case (method body or class)
+     * @param oracles List of oracle statements to assess
+     * @return The proportion of fields accessed by any of the oracles (0.0 to 1.0)
+     */
+    @Override
+    public double assessMultiple(String testCase, List<String> oracles) {
+        if (oracles == null || oracles.isEmpty()) {
+            lastTargetFields = new HashSet<>();
+            lastAccessedFields = new HashSet<>();
+            return 0.0;
+        }
+        
+        // Use configured target class path if available
+        String classPath = targetClassPath;
+        if (classPath == null || classPath.isEmpty()) {
+            String className = extractTargetClassName(testCase);
+            if (className == null || className.isEmpty()) {
+                lastTargetFields = new HashSet<>();
+                lastAccessedFields = new HashSet<>();
+                return 0.0;
+            }
+            classPath = "src/test/resources/" + className + ".java";
+        }
+        
+        // Get all fields in the target class
+        Set<String> allFields = getAllFieldsInClass(classPath);
+        lastTargetFields = new HashSet<>(allFields);
+        if (allFields.isEmpty()) {
+            lastAccessedFields = new HashSet<>();
+            return 0.0;
+        }
+        
+        // Compute the union of all fields accessed by any oracle
+        Set<String> unionAccessedFields = new HashSet<>();
+        for (String oracle : oracles) {
+            Set<String> oracleFields = getFieldsAccessedByOracle(testCase, oracle, classPath);
+            unionAccessedFields.addAll(oracleFields);
+        }
+        
+        lastAccessedFields = new HashSet<>(unionAccessedFields);
+        
+        // Calculate coverage
+        return (double) unionAccessedFields.size() / allFields.size();
     }
     
     /**
