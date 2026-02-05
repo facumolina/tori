@@ -26,6 +26,11 @@ public class StateFieldCoverage implements Metric {
     private final Map<String, Map<String, Set<String>>> methodFieldAccessCache;
     private String targetClassPath;
     
+    // Store detailed information for the last assessment
+    private Set<String> lastTargetFields;
+    private Set<String> lastAccessedFields;
+    private boolean detailedReportingEnabled;
+    
     public StateFieldCoverage() {
         this.javaLanguage = new TreeSitterJava();
         this.parser = new TSParser();
@@ -33,6 +38,9 @@ public class StateFieldCoverage implements Metric {
         this.classFieldsCache = new HashMap<>();
         this.methodFieldAccessCache = new HashMap<>();
         this.targetClassPath = null;
+        this.lastTargetFields = new HashSet<>();
+        this.lastAccessedFields = new HashSet<>();
+        this.detailedReportingEnabled = true;
     }
     
     /**
@@ -46,6 +54,14 @@ public class StateFieldCoverage implements Metric {
         this.targetClassPath = config.getProperty("target_class");
         if (this.targetClassPath == null || this.targetClassPath.isEmpty()) {
             throw new IllegalArgumentException("Configuration must contain 'target_class' property with the path to the target class");
+        }
+        
+        // Print target field information when configured
+        if (detailedReportingEnabled) {
+            Set<String> allFields = getAllFieldsInClass(targetClassPath);
+            System.out.println("Target class: " + targetClassPath);
+            System.out.println("Total target fields: " + allFields.size() + " " + allFields);
+            System.out.println();
         }
     }
     
@@ -68,6 +84,8 @@ public class StateFieldCoverage implements Metric {
             // to work with test resources. For production use, always provide a configuration file.
             String className = extractTargetClassName(testCase);
             if (className == null || className.isEmpty()) {
+                lastTargetFields = new HashSet<>();
+                lastAccessedFields = new HashSet<>();
                 return 0.0;
             }
             classPath = "src/test/resources/" + className + ".java";
@@ -75,15 +93,48 @@ public class StateFieldCoverage implements Metric {
         
         // Get all fields in the target class
         Set<String> allFields = getAllFieldsInClass(classPath);
+        lastTargetFields = new HashSet<>(allFields);
         if (allFields.isEmpty()) {
+            lastAccessedFields = new HashSet<>();
             return 0.0;
         }
         
         // Get fields accessed by the oracle
         Set<String> accessedFields = getFieldsAccessedByOracle(testCase, oracle, classPath);
+        lastAccessedFields = new HashSet<>(accessedFields);
         
         // Calculate coverage
         return (double) accessedFields.size() / allFields.size();
+    }
+    
+    /**
+     * Get the target fields from the last assessment.
+     * 
+     * @return Set of target field names
+     */
+    public Set<String> getLastTargetFields() {
+        return new HashSet<>(lastTargetFields);
+    }
+    
+    /**
+     * Get the accessed fields from the last assessment.
+     * 
+     * @return Set of accessed field names
+     */
+    public Set<String> getLastAccessedFields() {
+        return new HashSet<>(lastAccessedFields);
+    }
+    
+    /**
+     * Enable or disable detailed reporting in the configure method.
+     * This method should be called before configure() to prevent printing
+     * during configuration. If called after configure(), it will only affect
+     * future calls to configure() but not the current configuration's output.
+     * 
+     * @param enabled true to enable detailed reporting, false to disable
+     */
+    public void setDetailedReportingEnabled(boolean enabled) {
+        this.detailedReportingEnabled = enabled;
     }
     
     /**
