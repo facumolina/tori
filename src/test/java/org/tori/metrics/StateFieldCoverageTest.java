@@ -222,7 +222,9 @@ class StateFieldCoverageTest {
         var target = iterableMetric.getLastTargetFields();
         
         // Target should include both regular and special labels for iterable fields
-        assertTrue(target.size() == 6, "Should have 6 target fields (4 regular + 2 special labels)");
+        int expectedTargetFieldsWithIterable = 6;  // 4 regular + 2 special labels
+        assertEquals(expectedTargetFieldsWithIterable, target.size(), 
+            "Should have 6 target fields (4 regular + 2 special labels)");
         
         // Accessed should include special label for next (next+) since it's iterated
         assertTrue(accessed.stream().anyMatch(f -> f.contains("next+")), 
@@ -260,7 +262,9 @@ class StateFieldCoverageTest {
         assertEquals(0.75, score, 0.01, "Should be 0.75 when checkSize accesses 3 out of 4 fields");
         
         var target = noIterableMetric.getLastTargetFields();
-        assertEquals(4, target.size(), "Should have 4 target fields when iterable tracking is disabled");
+        int expectedTargetFieldsNoIterable = 4;  // Regular fields only
+        assertEquals(expectedTargetFieldsNoIterable, target.size(), 
+            "Should have 4 target fields when iterable tracking is disabled");
         
         // Should not have any + labels
         assertTrue(target.stream().noneMatch(f -> f.contains("+")), 
