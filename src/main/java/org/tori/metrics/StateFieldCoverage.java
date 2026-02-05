@@ -1127,8 +1127,8 @@ public class StateFieldCoverage implements Metric {
             if (typeNode != null && !classContext.isEmpty()) {
                 String typeName = extractTypeName(typeNode, sourceCode);
                 for (String fieldName : fieldNames) {
-                    String fqn = packageName.isEmpty() ? classContext + "." + fieldName :
-                                packageName + "." + classContext + "." + fieldName;
+                    // classContext already includes package name, so don't prepend it again
+                    String fqn = classContext + "." + fieldName;
                     fieldTypes.put(fqn, typeName);
                 }
             }
