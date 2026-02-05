@@ -92,6 +92,24 @@ Measures the proportion of fields in a target class that are accessed by test as
 **Configuration properties:**
 - `target_class`: Path to the target class file (required)
 - `exec_level`: Execution level - `assert`, `test_method`, or `test_class` (optional, default: `assert`)
+- `iterable_field_tracking`: Enable or disable iterable field tracking (optional, default: `true`)
+
+**Iterable Field Tracking:**
+
+When enabled (default), the metric distinguishes between iterable and non-iterable fields:
+
+- **Non-iterable fields** (e.g., `IntsList.header`, `IntsList.size`): Only one target label is considered (the field name). This label is covered if the assertion accesses the field.
+
+- **Iterable fields** (e.g., `IntsList.Node.next`, `IntsList.Node.item`): Two target labels are considered:
+  - Regular label (e.g., `IntsList.Node.next`): Covered if the assertion accesses the field
+  - Special iteration label (e.g., `IntsList.Node.next+`): Covered if code reachable from the assertion iterates over the field in a loop or recursive method
+
+Iterable fields include:
+- Collection types (arrays, List, Set, Map, etc.)
+- Recursive fields (fields whose type matches their containing class, e.g., `next` in a `Node` class)
+- Other fields in classes containing recursive fields (e.g., `item` in a `Node` class)
+
+Example: The `checkSize()` method in `IntsList` iterates over the list using a while loop that accesses the `next` field. With iterable field tracking enabled, this covers both `next` (regular access) and `next+` (iteration detected).
 
 ### CheckedVarsMetric
 
@@ -120,6 +138,13 @@ exec_level=assert
 ```properties
 target_class=src/test/resources/IntsList.java
 exec_level=test_method
+```
+
+**state_field_coverage_iterable.properties**:
+```properties
+target_class=src/test/resources/IntsList.java
+exec_level=assert
+iterable_field_tracking=true
 ```
 
 **checked_vars_test_class.properties**:
@@ -214,7 +239,26 @@ Test Class Assessment:
   Total assertions: 11
 ```
 
-### Example 6: Use CheckedVarsMetric with test_class level
+### Example 6: Use StateFieldCoverage with iterable field tracking
+
+```bash
+./gradlew run --args="-t src/test/resources/IntsListTest.java -m testCheckSize --metric org.tori.metrics.StateFieldCoverage --metric-config src/test/resources/state_field_coverage_iterable.properties"
+```
+
+Output:
+```
+Target class: src/test/resources/IntsList.java
+Total target fields: 6 [com.example.IntsList.Node.item, com.example.IntsList.header, com.example.IntsList.Node.item+, com.example.IntsList.Node.next+, com.example.IntsList.Node.next, com.example.IntsList.size]
+Execution level: assert
+Iterable field tracking: enabled
+
+Test Method: testCheckSize
+  - assertTrue(l.checkSize()); [score: 0.67, accessed fields: 4 [com.example.IntsList.header, com.example.IntsList.Node.next+, com.example.IntsList.Node.next, com.example.IntsList.size]]
+```
+
+In this example, the `checkSize()` method iterates over the list using a while loop, which accesses the `next` field. With iterable field tracking enabled, both the regular label (`next`) and the special iteration label (`next+`) are covered. The method accesses 4 out of 6 target fields (including special labels), achieving a score of 0.67.
+
+### Example 7: Use CheckedVarsMetric with test_class level
 
 ```bash
 ./gradlew run --args="-t src/test/resources/CalculatorTest.java --metric org.tori.metrics.CheckedVarsMetric --metric-config src/test/resources/checked_vars_test_class.properties"

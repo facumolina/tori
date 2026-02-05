@@ -89,4 +89,18 @@ public class IntsList {
     public Node getHeader() {
         return header;
     }
+    
+    /**
+     * Checks if the size field matches the actual number of elements
+     * by iterating over the list. Returns true if they match.
+     */
+    public boolean checkSize() {
+        int count = 0;
+        Node current = header;
+        while (current != null) {
+            count++;
+            current = current.next;
+        }
+        return count == size;
+    }
 }
