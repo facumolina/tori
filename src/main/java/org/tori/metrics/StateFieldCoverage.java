@@ -79,16 +79,6 @@ public class StateFieldCoverage implements Metric {
         if (iterableTrackingValue != null && !iterableTrackingValue.isEmpty()) {
             this.iterableFieldTrackingEnabled = Boolean.parseBoolean(iterableTrackingValue);
         }
-        
-        // Print target field information when configured
-        if (detailedReportingEnabled) {
-            Set<String> allFields = getAllFieldsInClass(targetClassPath);
-            System.out.println("Target class: " + targetClassPath);
-            System.out.println("Total target fields: " + allFields.size() + " " + allFields);
-            System.out.println("Execution level: " + executionLevel.getConfigValue());
-            System.out.println("Iterable field tracking: " + (iterableFieldTrackingEnabled ? "enabled" : "disabled"));
-            System.out.println();
-        }
     }
     
     /**
@@ -149,6 +139,36 @@ public class StateFieldCoverage implements Metric {
      */
     public Set<String> getLastAccessedFields() {
         return new HashSet<>(lastAccessedFields);
+    }
+    
+    /**
+     * Get the missing fields from the last assessment.
+     * Missing fields are target fields that were not accessed.
+     * 
+     * @return Set of missing field names
+     */
+    public Set<String> getLastMissingFields() {
+        Set<String> missingFields = new HashSet<>(lastTargetFields);
+        missingFields.removeAll(lastAccessedFields);
+        return missingFields;
+    }
+    
+    /**
+     * Get the target class path configured for this metric.
+     * 
+     * @return The target class path, or null if not configured
+     */
+    public String getTargetClassPath() {
+        return targetClassPath;
+    }
+    
+    /**
+     * Check if iterable field tracking is enabled.
+     * 
+     * @return true if iterable field tracking is enabled, false otherwise
+     */
+    public boolean isIterableFieldTrackingEnabled() {
+        return iterableFieldTrackingEnabled;
     }
     
     /**

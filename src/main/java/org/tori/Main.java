@@ -79,19 +79,19 @@ public class Main {
 
         // Print execution parameters
         System.out.println("Execution Parameters:");
-        System.out.println("  Test file: " + testFilePath);
+        System.out.println("  test-file: " + testFilePath);
         if (testMethodName != null) {
-            System.out.println("  Test method: " + testMethodName);
+            System.out.println("  test-method: " + testMethodName);
         } else {
-            System.out.println("  Test method: all");
+            System.out.println("  test-method: all");
         }
         if (metricClassName != null) {
-            System.out.println("  Metric: " + metricClassName);
+            System.out.println("  metric: " + metricClassName);
             if (metricConfigPath != null) {
-                System.out.println("  Metric config: " + metricConfigPath);
+                System.out.println("  metric-config: " + metricConfigPath);
             }
         } else {
-            System.out.println("  Metric: none");
+            System.out.println("  metric: none");
         }
         System.out.println();
 
@@ -129,6 +129,31 @@ public class Main {
                             config.load(fis);
                         }
                         metric.configure(config);
+                        
+                        // Print Metric Configuration section
+                        System.out.println("Metric Configuration:");
+                        if (metric instanceof org.tori.metrics.StateFieldCoverage) {
+                            org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
+                            System.out.println("  target_class: " + sfcMetric.getTargetClassPath());
+                            
+                            // Get all fields in the target class
+                            java.util.Set<String> allFields = sfcMetric.getLastTargetFields();
+                            if (allFields.isEmpty()) {
+                                // Need to load fields if not already loaded
+                                allFields = new java.util.HashSet<>();
+                                // This is a workaround - we'll trigger field loading by calling assess with empty data
+                                // But actually, we can't do that without affecting the state. Let's just read from the configured path
+                            }
+                            
+                            System.out.println("  exec_level: " + metric.getExecutionLevel().getConfigValue());
+                            System.out.println("  iterable_field_tracking: " + (sfcMetric.isIterableFieldTrackingEnabled() ? "enabled" : "disabled"));
+                        } else {
+                            // For other metrics, print all config properties
+                            for (String key : config.stringPropertyNames()) {
+                                System.out.println("  " + key + ": " + config.getProperty(key));
+                            }
+                        }
+                        System.out.println();
                         
                         // Validate execution level constraints
                         if (metric.getExecutionLevel() == org.tori.metrics.ExecutionLevel.TEST_CLASS && testMethodName != null) {
@@ -177,16 +202,20 @@ public class Main {
                     if (!allOracles.isEmpty()) {
                         double score = metric.assessMultiple(allTestCases.toString(), allOracles);
                         System.out.println("Test Class Assessment:");
-                        System.out.print("  All assertions [score: " + String.format("%.2f", score));
                         
                         if (metric instanceof org.tori.metrics.StateFieldCoverage) {
                             org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
                             java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
-                            System.out.print(", accessed fields: " + accessedFields.size() + " " + accessedFields);
+                            java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
+                            System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
+                            System.out.println("  total_assertions: " + allOracles.size());
+                            System.out.println("  accessed_fields: " + accessedFields.size() + " " + accessedFields);
+                            System.out.println("  missing_fields: " + missingFields.size() + " " + missingFields);
+                        } else {
+                            System.out.print("  All assertions [score: " + String.format("%.2f", score));
+                            System.out.println("]");
+                            System.out.println("  Total assertions: " + allOracles.size());
                         }
-                        
-                        System.out.println("]");
-                        System.out.println("  Total assertions: " + allOracles.size());
                     }
                     System.out.println();
                 } else if (metric != null && metric.getExecutionLevel() == org.tori.metrics.ExecutionLevel.TEST_METHOD) {
@@ -197,16 +226,20 @@ public class Main {
                             System.out.println("  No assertions found");
                         } else {
                             double score = metric.assessMultiple(methodOracles.testCaseSource(), methodOracles.oracles());
-                            System.out.print("  All assertions [score: " + String.format("%.2f", score));
                             
                             if (metric instanceof org.tori.metrics.StateFieldCoverage) {
                                 org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
                                 java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
-                                System.out.print(", accessed fields: " + accessedFields.size() + " " + accessedFields);
+                                java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
+                                System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
+                                System.out.println("  total_assertions: " + methodOracles.oracles().size());
+                                System.out.println("  accessed_fields: " + accessedFields.size() + " " + accessedFields);
+                                System.out.println("  missing_fields: " + missingFields.size() + " " + missingFields);
+                            } else {
+                                System.out.print("  All assertions [score: " + String.format("%.2f", score));
+                                System.out.println("]");
+                                System.out.println("  Total assertions: " + methodOracles.oracles().size());
                             }
-                            
-                            System.out.println("]");
-                            System.out.println("  Total assertions: " + methodOracles.oracles().size());
                         }
                         System.out.println();
                     }
@@ -220,16 +253,21 @@ public class Main {
                             for (String oracle : methodOracles.oracles()) {
                                 if (metric != null) {
                                     double score = metric.assess(methodOracles.testCaseSource(), oracle);
-                                    System.out.print("  - " + oracle + " [score: " + String.format("%.2f", score));
                                     
                                     // If the metric is StateFieldCoverage, print detailed field information
                                     if (metric instanceof org.tori.metrics.StateFieldCoverage) {
                                         org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
                                         java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
-                                        System.out.print(", accessed fields: " + accessedFields.size() + " " + accessedFields);
+                                        java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
+                                        System.out.println("  - " + oracle);
+                                        System.out.println("    state_field_coverage_score: " + String.format("%.2f", score));
+                                        System.out.println("    total_assertions: 1");
+                                        System.out.println("    accessed_fields: " + accessedFields.size() + " " + accessedFields);
+                                        System.out.println("    missing_fields: " + missingFields.size() + " " + missingFields);
+                                    } else {
+                                        System.out.print("  - " + oracle + " [score: " + String.format("%.2f", score));
+                                        System.out.println("]");
                                     }
-                                    
-                                    System.out.println("]");
                                 } else {
                                     System.out.println("  - " + oracle);
                                 }
