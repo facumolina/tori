@@ -135,16 +135,6 @@ public class Main {
                         if (metric instanceof org.tori.metrics.StateFieldCoverage) {
                             org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
                             System.out.println("  target_class: " + sfcMetric.getTargetClassPath());
-                            
-                            // Get all fields in the target class
-                            java.util.Set<String> allFields = sfcMetric.getLastTargetFields();
-                            if (allFields.isEmpty()) {
-                                // Need to load fields if not already loaded
-                                allFields = new java.util.HashSet<>();
-                                // This is a workaround - we'll trigger field loading by calling assess with empty data
-                                // But actually, we can't do that without affecting the state. Let's just read from the configured path
-                            }
-                            
                             System.out.println("  exec_level: " + metric.getExecutionLevel().getConfigValue());
                             System.out.println("  iterable_field_tracking: " + (sfcMetric.isIterableFieldTrackingEnabled() ? "enabled" : "disabled"));
                         } else {
