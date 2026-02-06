@@ -135,7 +135,7 @@ public class Main {
                         if (metric instanceof org.tori.metrics.StateFieldCoverage) {
                             org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
                             System.out.println("  target_class: " + sfcMetric.getTargetClassPath());
-                            System.out.println("  exec_level: " + metric.getExecutionLevel().getConfigValue());
+                            System.out.println("  exec_level: " + sfcMetric.getExecutionLevel().getConfigValue());
                             System.out.println("  iterable_field_tracking: " + (sfcMetric.isIterableFieldTrackingEnabled() ? "enabled" : "disabled"));
                         } else {
                             // For other metrics, print all config properties
