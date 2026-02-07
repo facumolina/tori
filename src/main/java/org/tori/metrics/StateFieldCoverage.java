@@ -66,7 +66,7 @@ public class StateFieldCoverage implements Metric {
     public void configure(Properties config) {
         String targetClassProperty = config.getProperty("target_class");
         if (targetClassProperty == null || targetClassProperty.isEmpty()) {
-            throw new IllegalArgumentException("Configuration must contain 'target_class' property with the path to the target class");
+            throw new IllegalArgumentException("Configuration must contain 'target_class' property with path(s) to the target class(es)");
         }
         
         // Parse comma-separated target class paths
@@ -80,7 +80,7 @@ public class StateFieldCoverage implements Metric {
         }
         
         if (this.targetClassPaths.isEmpty()) {
-            throw new IllegalArgumentException("Configuration must contain at least one valid target class path");
+            throw new IllegalArgumentException("Configuration must contain at least one valid non-empty target class path");
         }
         
         // Configure execution level

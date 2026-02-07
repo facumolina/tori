@@ -17,15 +17,15 @@ import static org.junit.jupiter.api.Assertions.*;
  * - Node.next (Node)
  * - Node.item (int)
  * 
- * Person has 5 fields:
+ * Person has 6 fields:
  * - Person.name (String)
  * - Person.age (int)
  * - Person.address (Address)
  * - Address.street (String)
  * - Address.city (String)
- * - Address.name (String)
+ * - Address.name (String) - distinct from Person.name as it belongs to Address class
  * 
- * Total: 9 fields (or 10 if Address.name is counted separately from Person.name, which it should be)
+ * Total: 10 fields (4 from IntsList + 6 from Person)
  */
 class StateFieldCoverageMultipleClassesTest {
 
@@ -40,7 +40,7 @@ class StateFieldCoverageMultipleClassesTest {
         
         // Configure the metric with multiple target classes
         Properties config = new Properties();
-        config.setProperty("target_class", "src/test/resources/IntsList.java, src/test/resources/Person.java");
+        config.setProperty("target_class", "src/test/resources/IntsList.java,src/test/resources/Person.java");
         config.setProperty("iterable_field_tracking", "false"); // Disable for simpler tests
         metric.configure(config);
     }
@@ -82,9 +82,11 @@ class StateFieldCoverageMultipleClassesTest {
         double score = metric.assess(testCase, oracle);
         
         // getName() matches both Person.getName() and Address.getName()
-        // So both Person.name and Address.name are conservatively marked as accessed
-        // 2 out of 10 total fields
-        assertEquals(0.2, score, 0.01, "Should be 0.2 when 2 name fields are accessed (conservative)");
+        // This is because the metric conservatively considers all methods with the same name
+        // when it cannot determine which specific method is being called (no type inference).
+        // So both Person.name and Address.name are marked as accessed.
+        // Total: 2 out of 10 fields
+        assertEquals(0.2, score, 0.01, "Should be 0.2 when 2 name fields are accessed (conservative matching)");
     }
 
     @Test
@@ -217,6 +219,7 @@ class StateFieldCoverageMultipleClassesTest {
             public void test1() {
                 IntsList l = new IntsList();
                 l.add(10);
+                l.add(20);
                 assertEquals(2, l.getSize());
             }
             """;

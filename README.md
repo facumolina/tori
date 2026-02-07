@@ -100,7 +100,7 @@ You can specify multiple target classes by separating their paths with commas. W
 
 Example configuration:
 ```properties
-target_class=src/test/resources/IntsList.java, src/test/resources/Person.java
+target_class=src/test/resources/IntsList.java,src/test/resources/Person.java
 ```
 
 Note: When a class is specified as a target class, the fields of all reachable classes from it (including inner classes) are automatically considered. If you specify both a parent class and a subclass that is already reachable from the parent, the fields will be the same as only specifying the parent class (no duplication).
@@ -160,7 +160,7 @@ iterable_field_tracking=true
 
 **state_field_coverage_multiple_classes.properties**:
 ```properties
-target_class=src/test/resources/IntsList.java, src/test/resources/Person.java
+target_class=src/test/resources/IntsList.java,src/test/resources/Person.java
 exec_level=assert
 iterable_field_tracking=false
 ```
