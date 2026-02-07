@@ -134,7 +134,12 @@ public class Main {
                         System.out.println("Metric Configuration:");
                         if (metric instanceof org.tori.metrics.StateFieldCoverage) {
                             org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
-                            System.out.println("  target_class: " + sfcMetric.getTargetClassPath());
+                            java.util.List<String> paths = sfcMetric.getTargetClassPaths();
+                            if (paths.size() == 1) {
+                                System.out.println("  target_class: " + paths.get(0));
+                            } else {
+                                System.out.println("  target_classes: " + String.join(", ", paths));
+                            }
                             System.out.println("  exec_level: " + sfcMetric.getExecutionLevel().getConfigValue());
                             System.out.println("  iterable_field_tracking: " + (sfcMetric.isIterableFieldTrackingEnabled() ? "enabled" : "disabled"));
                         } else {
