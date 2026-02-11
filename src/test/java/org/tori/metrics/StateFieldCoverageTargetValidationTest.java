@@ -33,7 +33,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testConfigure_NonJavaFile_ThrowsException() {
-        // Create a temporary non-Java file for testing
+        // Test with an existing non-Java file (README.md)
         StateFieldCoverage metric = new StateFieldCoverage();
         Properties config = new Properties();
         config.setProperty("target_class", "README.md");
