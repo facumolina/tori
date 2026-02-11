@@ -307,4 +307,99 @@ class StateFieldCoverageTest {
         // Provided test has different fields, so we should get 0 coverage for IntsList fields
         assertEquals(0.0, score, 0.01, "Should be 0.0 when testing a similar class with different fields");
     }
+    
+    @Test
+    void testAssess_packageAware_samePackage() {
+        // Test that when a variable is of the target class type (same package), fields are counted
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/IntsList.java");
+        metric.configure(config);
+        
+        String testCase = """
+            package com.example;
+            
+            @Test
+            public void test() {
+                IntsList l = new IntsList();
+                l.add(10);
+                assertEquals(1, l.getSize());
+            }
+            """;
+        String oracle = "assertEquals(1, l.getSize());";
+        
+        double score = metric.assess(testCase, oracle);
+        // getSize accesses the size field (1 out of 4)
+        assertEquals(0.25, score, 0.01, "Should be 0.25 when size field is accessed in same package");
+    }
+    
+    @Test
+    void testAssess_packageAware_differentPackage() {
+        // Test that when a variable is of a class with the same name but different package, 
+        // fields are NOT counted
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/IntsList.java");
+        metric.configure(config);
+        
+        String testCase = """
+            package org.other;
+            
+            @Test
+            public void test() {
+                IntsList l = new IntsList();
+                l.add(10);
+                assertEquals(1, l.getCount());
+            }
+            """;
+        String oracle = "assertEquals(1, l.getCount());";
+        
+        double score = metric.assess(testCase, oracle);
+        // The test uses org.other.IntsList, not com.example.IntsList, so no fields should match
+        assertEquals(0.0, score, 0.01, "Should be 0.0 when using a class with same name but different package");
+    }
+    
+    @Test
+    void testAssess_packageAware_noPackageInTest() {
+        // Test that when test has no package declaration, we assume the target's package
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/IntsList.java");
+        metric.configure(config);
+        
+        String testCase = """
+            @Test
+            public void test() {
+                IntsList l = new IntsList();
+                l.add(10);
+                assertEquals(1, l.getSize());
+            }
+            """;
+        String oracle = "assertEquals(1, l.getSize());";
+        
+        double score = metric.assess(testCase, oracle);
+        // No package in test, so we assume com.example package (same as target)
+        // getSize accesses the size field (1 out of 4)
+        assertEquals(0.25, score, 0.01, "Should be 0.25 when no package in test (assumes target package)");
+    }
+    
+    @Test
+    void testAssess_packageAware_differentClassName() {
+        // Test that fields are correctly filtered by class name
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/IntsList.java");
+        metric.configure(config);
+        
+        String testCase = """
+            package com.example;
+            
+            @Test
+            public void test() {
+                Person p = new Person("John", 30);
+                assertEquals("John", p.getName());
+            }
+            """;
+        String oracle = "assertEquals(\"John\", p.getName());";
+        
+        double score = metric.assess(testCase, oracle);
+        // Person is not IntsList, so no fields should be counted
+        assertEquals(0.0, score, 0.01, "Should be 0.0 when using a different class");
+    }
 }

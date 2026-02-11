@@ -559,6 +559,7 @@ public class StateFieldCoverage implements Metric {
     /**
      * Get the fields accessed by an oracle statement.
      * This traces method calls to determine which fields are accessed.
+     * Now includes package-aware filtering to ensure only fields from the target class are counted.
      */
     private Set<String> getFieldsAccessedByOracle(String testCase, String oracle, String classPath) {
         Set<String> accessedFields = new HashSet<>();
@@ -566,21 +567,26 @@ public class StateFieldCoverage implements Metric {
         // Get all fields in the target class (with FQN)
         Set<String> allFields = getAllFieldsInClass(classPath);
         
+        // Extract target class information (name and package)
+        TargetClassInfo targetClassInfo = extractTargetClassInfo(classPath);
+        if (targetClassInfo == null) {
+            return accessedFields;
+        }
+        
+        // Extract variable types from the test case
+        Map<String, String> variableTypes = extractVariableTypes(testCase);
+        
+        // Extract package from test class (if available)
+        String testPackage = extractPackageNameFromTestCase(testCase);
+        
         TSTree tree = parser.parseString(null, oracle);
         TSNode rootNode = tree.getRootNode();
         
-        // Find all method invocations in the oracle
-        Set<String> methodCalls = new HashSet<>();
-        findMethodInvocations(rootNode, oracle, methodCalls);
+        // Find all method invocations in the oracle, filtering by variable type
+        findMethodInvocationsWithTypeCheck(rootNode, oracle, variableTypes, targetClassInfo, testPackage, accessedFields, classPath);
         
-        // For each method call, determine which fields it accesses
-        for (String methodName : methodCalls) {
-            Set<String> methodFields = getFieldsAccessedByMethod(classPath, methodName);
-            accessedFields.addAll(methodFields);
-        }
-        
-        // Also check for direct field accesses in the oracle
-        findDirectFieldAccesses(rootNode, oracle, accessedFields, allFields);
+        // Also check for direct field accesses in the oracle, filtering by variable type
+        findDirectFieldAccessesWithTypeCheck(rootNode, oracle, accessedFields, allFields, variableTypes, targetClassInfo, testPackage);
         
         return accessedFields;
     }
@@ -1417,5 +1423,345 @@ public class StateFieldCoverage implements Metric {
         }
         
         return false;
+    }
+    
+    /**
+     * Helper class to store target class information.
+     */
+    private static class TargetClassInfo {
+        String className;
+        String packageName;
+        String fullyQualifiedName;
+        
+        TargetClassInfo(String className, String packageName) {
+            this.className = className;
+            this.packageName = packageName;
+            this.fullyQualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
+        }
+    }
+    
+    /**
+     * Extract target class information (class name and package) from the target class file.
+     */
+    private TargetClassInfo extractTargetClassInfo(String classPath) {
+        Path path = Paths.get(classPath);
+        if (!Files.exists(path)) {
+            return null;
+        }
+        
+        try {
+            String classSource = Files.readString(path);
+            TSTree tree = parser.parseString(null, classSource);
+            TSNode rootNode = tree.getRootNode();
+            
+            // Extract package name
+            String packageName = extractPackageName(rootNode, classSource);
+            
+            // Extract class name
+            String className = extractClassNameFromDeclaration(rootNode, classSource);
+            if (className == null) {
+                return null;
+            }
+            
+            return new TargetClassInfo(className, packageName);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Extract the class name from the class declaration.
+     */
+    private String extractClassNameFromDeclaration(TSNode node, String sourceCode) {
+        String nodeType = node.getType();
+        
+        if ("class_declaration".equals(nodeType)) {
+            TSNode nameNode = node.getChildByFieldName("name");
+            if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                int startByte = nameNode.getStartByte();
+                int endByte = nameNode.getEndByte();
+                return sourceCode.substring(startByte, endByte);
+            }
+        }
+        
+        // Recursively search children (only look at the first level)
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            String className = extractClassNameFromDeclaration(child, sourceCode);
+            if (className != null) {
+                return className;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Extract variable types from the test case.
+     * Returns a map from variable name to type (simple class name).
+     */
+    private Map<String, String> extractVariableTypes(String testCase) {
+        Map<String, String> variableTypes = new HashMap<>();
+        
+        TSTree tree = parser.parseString(null, testCase);
+        TSNode rootNode = tree.getRootNode();
+        
+        findVariableDeclarations(rootNode, testCase, variableTypes);
+        
+        return variableTypes;
+    }
+    
+    /**
+     * Find variable declarations and extract their types.
+     */
+    private void findVariableDeclarations(TSNode node, String sourceCode, Map<String, String> variableTypes) {
+        if (node == null) {
+            return;
+        }
+        
+        String nodeType = node.getType();
+        
+        if ("local_variable_declaration".equals(nodeType)) {
+            // Extract type
+            TSNode typeNode = node.getChildByFieldName("type");
+            if (typeNode != null) {
+                String type = extractTypeFromNode(typeNode, sourceCode);
+                
+                // Find all variable declarators
+                int childCount = node.getChildCount();
+                for (int i = 0; i < childCount; i++) {
+                    TSNode child = node.getChild(i);
+                    if (child != null && "variable_declarator".equals(child.getType())) {
+                        TSNode nameNode = child.getChildCount() > 0 ? child.getChild(0) : null;
+                        if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                            int startByte = nameNode.getStartByte();
+                            int endByte = nameNode.getEndByte();
+                            String varName = sourceCode.substring(startByte, endByte);
+                            if (type != null) {
+                                variableTypes.put(varName, type);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Recursively process children
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            if (child != null) {
+                findVariableDeclarations(child, sourceCode, variableTypes);
+            }
+        }
+    }
+    
+    /**
+     * Extract type from a type node.
+     */
+    private String extractTypeFromNode(TSNode typeNode, String sourceCode) {
+        if (typeNode == null) {
+            return null;
+        }
+        
+        String nodeType = typeNode.getType();
+        
+        if ("type_identifier".equals(nodeType)) {
+            int startByte = typeNode.getStartByte();
+            int endByte = typeNode.getEndByte();
+            return sourceCode.substring(startByte, endByte);
+        } else if ("generic_type".equals(nodeType)) {
+            // For generic types like List<String>, extract just the base type
+            TSNode typeIdentifier = typeNode.getChildCount() > 0 ? typeNode.getChild(0) : null;
+            if (typeIdentifier != null && "type_identifier".equals(typeIdentifier.getType())) {
+                int startByte = typeIdentifier.getStartByte();
+                int endByte = typeIdentifier.getEndByte();
+                return sourceCode.substring(startByte, endByte);
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Extract package name from test case.
+     */
+    private String extractPackageNameFromTestCase(String testCase) {
+        TSTree tree = parser.parseString(null, testCase);
+        TSNode rootNode = tree.getRootNode();
+        return extractPackageName(rootNode, testCase);
+    }
+    
+    /**
+     * Find method invocations with type checking to ensure they belong to the target class.
+     * Note: We use a conservative approach - if we cannot identify the variable (e.g., for
+     * chained method calls like r.createList().method()), we allow the field access rather
+     * than rejecting it. This trade-off:
+     * - Prevents false negatives (important for not under-reporting coverage)
+     * - May allow some false positives for complex chained calls
+     * - Maintains backward compatibility with existing tests
+     * The primary goal is to filter out clearly different classes (different package/name),
+     * not to achieve perfect type inference.
+     */
+    private void findMethodInvocationsWithTypeCheck(TSNode node, String sourceCode, 
+                                                     Map<String, String> variableTypes,
+                                                     TargetClassInfo targetClassInfo,
+                                                     String testPackage,
+                                                     Set<String> accessedFields,
+                                                     String classPath) {
+        if (node == null) {
+            return;
+        }
+        
+        String nodeType = node.getType();
+        
+        if ("method_invocation".equals(nodeType)) {
+            // Get the object on which the method is called
+            TSNode objectNode = node.getChildByFieldName("object");
+            if (objectNode != null) {
+                String variableName = extractIdentifierFromExpression(objectNode, sourceCode);
+                // If we can identify the variable, check its type
+                // If we can't (like for method chains), allow it (conservative approach)
+                if (variableName == null || isTargetClassType(variableName, variableTypes, targetClassInfo, testPackage)) {
+                    // Get the method name
+                    TSNode nameNode = node.getChildByFieldName("name");
+                    if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                        int startByte = nameNode.getStartByte();
+                        int endByte = nameNode.getEndByte();
+                        String methodName = sourceCode.substring(startByte, endByte);
+                        
+                        // Get fields accessed by this method
+                        Set<String> methodFields = getFieldsAccessedByMethod(classPath, methodName);
+                        accessedFields.addAll(methodFields);
+                    }
+                }
+            }
+        }
+        
+        // Recursively process children
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            if (child != null) {
+                findMethodInvocationsWithTypeCheck(child, sourceCode, variableTypes, targetClassInfo, 
+                                                  testPackage, accessedFields, classPath);
+            }
+        }
+    }
+    
+    /**
+     * Find direct field accesses with type checking.
+     */
+    private void findDirectFieldAccessesWithTypeCheck(TSNode node, String sourceCode, 
+                                                      Set<String> fields, Set<String> allFields,
+                                                      Map<String, String> variableTypes,
+                                                      TargetClassInfo targetClassInfo,
+                                                      String testPackage) {
+        if (node == null) {
+            return;
+        }
+        
+        String nodeType = node.getType();
+        
+        if ("field_access".equals(nodeType)) {
+            // Get the object on which the field is accessed
+            TSNode objectNode = node.getChildByFieldName("object");
+            if (objectNode != null) {
+                String variableName = extractIdentifierFromExpression(objectNode, sourceCode);
+                // If we can identify the variable, check its type
+                // If we can't (like for method chains), allow it (conservative approach)
+                if (variableName == null || isTargetClassType(variableName, variableTypes, targetClassInfo, testPackage)) {
+                    TSNode fieldNode = node.getChildByFieldName("field");
+                    if (fieldNode != null && "identifier".equals(fieldNode.getType())) {
+                        int startByte = fieldNode.getStartByte();
+                        int endByte = fieldNode.getEndByte();
+                        String fieldName = sourceCode.substring(startByte, endByte);
+                        
+                        // Map short field name to FQN
+                        String fqn = mapFieldNameToFQN(fieldName, allFields);
+                        if (fqn != null) {
+                            fields.add(fqn);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Recursively process children
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            if (child != null) {
+                findDirectFieldAccessesWithTypeCheck(child, sourceCode, fields, allFields, 
+                                                    variableTypes, targetClassInfo, testPackage);
+            }
+        }
+    }
+    
+    /**
+     * Extract identifier from an expression (handles simple identifiers and chained calls).
+     */
+    private String extractIdentifierFromExpression(TSNode node, String sourceCode) {
+        if (node == null) {
+            return null;
+        }
+        
+        try {
+            String nodeType = node.getType();
+            
+            if ("identifier".equals(nodeType)) {
+                int startByte = node.getStartByte();
+                int endByte = node.getEndByte();
+                return sourceCode.substring(startByte, endByte);
+            } else if ("method_invocation".equals(nodeType) || "field_access".equals(nodeType)) {
+                // For chained calls like r.createStackedValueList(...), we don't know the type
+                // so we can't verify it. Return null to skip type checking.
+                return null;
+            }
+        } catch (Exception e) {
+            // Handle Tree-sitter null node exceptions
+            return null;
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Check if a variable is of the target class type.
+     * If the variable type doesn't specify a package, the matching behavior depends on
+     * whether the test declares a package:
+     * - If the test has no package declaration, we assume the test is in the same package
+     *   as the target class (so a variable of type "IntsList" matches target "com.example.IntsList")
+     * - If the test declares a different package, then the types don't match
+     */
+    private boolean isTargetClassType(String variableName, Map<String, String> variableTypes, 
+                                     TargetClassInfo targetClassInfo, String testPackage) {
+        String varType = variableTypes.get(variableName);
+        if (varType == null) {
+            // Variable not found, might be a parameter or field - be conservative and allow it
+            return true;
+        }
+        
+        // Check if the variable type matches the target class name
+        if (!varType.equals(targetClassInfo.className)) {
+            return false;
+        }
+        
+        // If the target class has no package, any variable with matching simple name is okay
+        if (targetClassInfo.packageName.isEmpty()) {
+            return true;
+        }
+        
+        // If test has no package declaration, assume the test is in the same package as the target.
+        // This implements the requirement: "If the test class does not mention the package 
+        // of the target class, assume as target package the package of the test class."
+        // In this case, testPackage is empty, so we assume it matches the target package.
+        if (testPackage.isEmpty()) {
+            return true;
+        }
+        
+        // Both have packages - they should match
+        return targetClassInfo.packageName.equals(testPackage);
     }
 }
