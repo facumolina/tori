@@ -1595,6 +1595,14 @@ public class StateFieldCoverage implements Metric {
     
     /**
      * Find method invocations with type checking to ensure they belong to the target class.
+     * Note: We use a conservative approach - if we cannot identify the variable (e.g., for
+     * chained method calls like r.createList().method()), we allow the field access rather
+     * than rejecting it. This trade-off:
+     * - Prevents false negatives (important for not under-reporting coverage)
+     * - May allow some false positives for complex chained calls
+     * - Maintains backward compatibility with existing tests
+     * The primary goal is to filter out clearly different classes (different package/name),
+     * not to achieve perfect type inference.
      */
     private void findMethodInvocationsWithTypeCheck(TSNode node, String sourceCode, 
                                                      Map<String, String> variableTypes,
@@ -1721,7 +1729,11 @@ public class StateFieldCoverage implements Metric {
     
     /**
      * Check if a variable is of the target class type.
-     * If the variable type doesn't specify a package, assume the test package.
+     * If the variable type doesn't specify a package, the matching behavior depends on
+     * whether the test declares a package:
+     * - If the test has no package declaration, we assume the test is in the same package
+     *   as the target class (so a variable of type "IntsList" matches target "com.example.IntsList")
+     * - If the test declares a different package, then the types don't match
      */
     private boolean isTargetClassType(String variableName, Map<String, String> variableTypes, 
                                      TargetClassInfo targetClassInfo, String testPackage) {
@@ -1741,9 +1753,10 @@ public class StateFieldCoverage implements Metric {
             return true;
         }
         
-        // If test has no package, assume the target package
-        // (This implements the requirement: "If the test class does not mention the package 
-        // of the target class, assume as target package the package of the test class.")
+        // If test has no package declaration, assume the test is in the same package as the target.
+        // This implements the requirement: "If the test class does not mention the package 
+        // of the target class, assume as target package the package of the test class."
+        // In this case, testPackage is empty, so we assume it matches the target package.
         if (testPackage.isEmpty()) {
             return true;
         }
