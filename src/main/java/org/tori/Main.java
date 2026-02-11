@@ -140,6 +140,18 @@ public class Main {
                             } else {
                                 System.out.println("  target_classes: " + String.join(", ", paths));
                             }
+                            
+                            // Report identified target fields
+                            java.util.Set<String> targetFields = sfcMetric.getLastTargetFields();
+                            System.out.println("  target_fields: " + targetFields.size() + " fields identified");
+                            if (!targetFields.isEmpty()) {
+                                java.util.List<String> sortedFields = new java.util.ArrayList<>(targetFields);
+                                java.util.Collections.sort(sortedFields);
+                                for (String field : sortedFields) {
+                                    System.out.println("    - " + field);
+                                }
+                            }
+                            
                             System.out.println("  exec_level: " + sfcMetric.getExecutionLevel().getConfigValue());
                             System.out.println("  iterable_field_tracking: " + (sfcMetric.isIterableFieldTrackingEnabled() ? "enabled" : "disabled"));
                         } else {
