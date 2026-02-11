@@ -3,6 +3,8 @@ package org.tori.metrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -269,5 +271,40 @@ class StateFieldCoverageTest {
         // Should not have any + labels
         assertTrue(target.stream().noneMatch(f -> f.contains("+")), 
             "Should not have any special + labels when iterable tracking is disabled");
+    }
+
+    @Test
+    void testAssess_similarClass() {
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/IntsList.java");
+        config.setProperty("exec_level", "test_method");
+        metric.configure(config);
+        
+        // Test with a similar class that has different fields to ensure correct field identification
+        String testCase = """
+            @Test
+            public void testCreateStackedValueList1a() {
+                DefaultCategoryDataset d = new DefaultCategoryDataset();
+                d.addValue(1.0, "s0", "c0");
+                d.addValue(1.1, "s1", "c0");
+                MyRenderer r = new MyRenderer();
+                List l = r.createStackedValueList(d, "c0", new int[] { 0, 1 }, 0.0, false);
+                
+                assertEquals(3, l.size());
+                assertEquals(new Double(0.0), ((Object[]) l.get(0))[1]);
+                assertEquals(new Double(1.0), ((Object[]) l.get(1))[1]);
+                assertEquals(new Double(2.1), ((Object[]) l.get(2))[1]);
+            }
+            """;
+        List<String> oracles = Arrays.asList(
+            "assertEquals(3, l.size());",
+            "assertEquals(new Double(0.0), ((Object[]) l.get(0))[1]);",
+            "assertEquals(new Double(1.0), ((Object[]) l.get(1))[1]);",
+            "assertEquals(new Double(2.1), ((Object[]) l.get(2))[1]);"
+        );
+        
+        double score = metric.assessMultiple(testCase, oracles);
+        // Provided test has different fields, so we should get 0 coverage for IntsList fields
+        assertEquals(0.0, score, 0.01, "Should be 0.0 when testing a similar class with different fields");
     }
 }
