@@ -90,9 +90,20 @@ Tori supports metrics that can assess the quality of test oracles. Currently, tw
 Measures the proportion of fields in a target class that are accessed by test assertions. This metric helps assess how comprehensively an oracle tests the state of an object.
 
 **Configuration properties:**
-- `target_class`: Path to the target class file (required)
+- `target_class`: Path to the target class file(s). Multiple classes can be specified as comma-separated values (required)
 - `exec_level`: Execution level - `assert`, `test_method`, or `test_class` (optional, default: `assert`)
 - `iterable_field_tracking`: Enable or disable iterable field tracking (optional, default: `true`)
+
+**Multiple Target Classes:**
+
+You can specify multiple target classes by separating their paths with commas. When multiple classes are specified, the metric will consider the fields from all classes when computing the coverage score.
+
+Example configuration:
+```properties
+target_class=src/test/resources/IntsList.java,src/test/resources/Person.java
+```
+
+Note: When a class is specified as a target class, the fields of all reachable classes from it (including inner classes) are automatically considered. If you specify both a parent class and a subclass that is already reachable from the parent, the fields will be the same as only specifying the parent class (no duplication).
 
 **Iterable Field Tracking:**
 
@@ -145,6 +156,13 @@ exec_level=test_method
 target_class=src/test/resources/IntsList.java
 exec_level=assert
 iterable_field_tracking=true
+```
+
+**state_field_coverage_multiple_classes.properties**:
+```properties
+target_class=src/test/resources/IntsList.java,src/test/resources/Person.java
+exec_level=assert
+iterable_field_tracking=false
 ```
 
 **checked_vars_test_class.properties**:
