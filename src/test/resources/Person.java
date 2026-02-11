@@ -23,6 +23,14 @@ public class Person {
         public String getName() {
             return name;
         }
+        
+        public String getStreet() {
+            return street;
+        }
+        
+        public String getCity() {
+            return city;
+        }
     }
     
     // Note: 'name' field also exists in the Person class

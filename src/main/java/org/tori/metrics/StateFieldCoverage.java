@@ -26,7 +26,7 @@ public class StateFieldCoverage implements Metric {
     private final TSLanguage javaLanguage;
     private final Map<String, Set<String>> classFieldsCache;
     private final Map<String, Map<String, Set<String>>> methodFieldAccessCache;
-    private String targetClassPath;
+    private List<String> targetClassPaths;
     private ExecutionLevel executionLevel;
     
     // Store detailed information for the last assessment
@@ -45,7 +45,7 @@ public class StateFieldCoverage implements Metric {
         parser.setLanguage(javaLanguage);
         this.classFieldsCache = new HashMap<>();
         this.methodFieldAccessCache = new HashMap<>();
-        this.targetClassPath = null;
+        this.targetClassPaths = new ArrayList<>();
         this.executionLevel = ExecutionLevel.ASSERT;
         this.lastTargetFields = new HashSet<>();
         this.lastAccessedFields = new HashSet<>();
@@ -57,15 +57,30 @@ public class StateFieldCoverage implements Metric {
     
     /**
      * Configure the metric with properties.
-     * Expected property: target_class - the path to the target class file
+     * Expected property: target_class - the path(s) to the target class file(s).
+     * Multiple classes can be specified as comma-separated values.
      * 
      * @param config Properties object containing metric configuration
      */
     @Override
     public void configure(Properties config) {
-        this.targetClassPath = config.getProperty("target_class");
-        if (this.targetClassPath == null || this.targetClassPath.isEmpty()) {
-            throw new IllegalArgumentException("Configuration must contain 'target_class' property with the path to the target class");
+        String targetClassProperty = config.getProperty("target_class");
+        if (targetClassProperty == null || targetClassProperty.isEmpty()) {
+            throw new IllegalArgumentException("Configuration must contain 'target_class' property with path(s) to the target class(es)");
+        }
+        
+        // Parse comma-separated target class paths
+        this.targetClassPaths = new ArrayList<>();
+        String[] paths = targetClassProperty.split(",");
+        for (String path : paths) {
+            String trimmedPath = path.trim();
+            if (!trimmedPath.isEmpty()) {
+                this.targetClassPaths.add(trimmedPath);
+            }
+        }
+        
+        if (this.targetClassPaths.isEmpty()) {
+            throw new IllegalArgumentException("Configuration must contain at least one valid non-empty target class path");
         }
         
         // Configure execution level
@@ -91,9 +106,9 @@ public class StateFieldCoverage implements Metric {
      */
     @Override
     public double assess(String testCase, String oracle) {
-        // Use configured target class path if available, otherwise extract from test case
-        String classPath = targetClassPath;
-        if (classPath == null || classPath.isEmpty()) {
+        // Use configured target class paths if available, otherwise extract from test case
+        List<String> classPaths = targetClassPaths;
+        if (classPaths == null || classPaths.isEmpty()) {
             // Fallback: extract the target class from the test case
             // Note: This fallback is primarily for backward compatibility and testing purposes
             // The hardcoded 'src/test/resources/' path is intentional as this metric is designed
@@ -104,19 +119,20 @@ public class StateFieldCoverage implements Metric {
                 lastAccessedFields = new HashSet<>();
                 return 0.0;
             }
-            classPath = "src/test/resources/" + className + ".java";
+            classPaths = new ArrayList<>();
+            classPaths.add("src/test/resources/" + className + ".java");
         }
         
-        // Get all fields in the target class
-        Set<String> allFields = getAllFieldsInClass(classPath);
+        // Get all fields from all target classes
+        Set<String> allFields = getAllFieldsInTargetClasses(classPaths);
         lastTargetFields = new HashSet<>(allFields);
         if (allFields.isEmpty()) {
             lastAccessedFields = new HashSet<>();
             return 0.0;
         }
         
-        // Get fields accessed by the oracle
-        Set<String> accessedFields = getFieldsAccessedByOracle(testCase, oracle, classPath);
+        // Get fields accessed by the oracle from all target classes
+        Set<String> accessedFields = getFieldsAccessedByOracleInTargetClasses(testCase, oracle, classPaths);
         lastAccessedFields = new HashSet<>(accessedFields);
         
         // Calculate coverage
@@ -155,11 +171,25 @@ public class StateFieldCoverage implements Metric {
     
     /**
      * Get the target class path configured for this metric.
+     * If multiple target classes are configured, returns the first one.
+     * For backward compatibility only. Use getTargetClassPaths() for full list.
      * 
-     * @return The target class path, or null if not configured
+     * @return The first target class path, or null if not configured
      */
     public String getTargetClassPath() {
-        return targetClassPath;
+        if (targetClassPaths == null || targetClassPaths.isEmpty()) {
+            return null;
+        }
+        return targetClassPaths.get(0);
+    }
+    
+    /**
+     * Get all target class paths configured for this metric.
+     * 
+     * @return List of target class paths, or empty list if not configured
+     */
+    public List<String> getTargetClassPaths() {
+        return new ArrayList<>(targetClassPaths);
     }
     
     /**
@@ -209,20 +239,21 @@ public class StateFieldCoverage implements Metric {
             return 0.0;
         }
         
-        // Use configured target class path if available
-        String classPath = targetClassPath;
-        if (classPath == null || classPath.isEmpty()) {
+        // Use configured target class paths if available
+        List<String> classPaths = targetClassPaths;
+        if (classPaths == null || classPaths.isEmpty()) {
             String className = extractTargetClassName(testCase);
             if (className == null || className.isEmpty()) {
                 lastTargetFields = new HashSet<>();
                 lastAccessedFields = new HashSet<>();
                 return 0.0;
             }
-            classPath = "src/test/resources/" + className + ".java";
+            classPaths = new ArrayList<>();
+            classPaths.add("src/test/resources/" + className + ".java");
         }
         
-        // Get all fields in the target class
-        Set<String> allFields = getAllFieldsInClass(classPath);
+        // Get all fields from all target classes
+        Set<String> allFields = getAllFieldsInTargetClasses(classPaths);
         lastTargetFields = new HashSet<>(allFields);
         if (allFields.isEmpty()) {
             lastAccessedFields = new HashSet<>();
@@ -232,7 +263,7 @@ public class StateFieldCoverage implements Metric {
         // Compute the union of all fields accessed by any oracle
         Set<String> unionAccessedFields = new HashSet<>();
         for (String oracle : oracles) {
-            Set<String> oracleFields = getFieldsAccessedByOracle(testCase, oracle, classPath);
+            Set<String> oracleFields = getFieldsAccessedByOracleInTargetClasses(testCase, oracle, classPaths);
             unionAccessedFields.addAll(oracleFields);
         }
         
@@ -347,6 +378,25 @@ public class StateFieldCoverage implements Metric {
         
         classFieldsCache.put(classPath, fields);
         return fields;
+    }
+    
+    /**
+     * Get all fields defined in multiple target classes, including fields from inner classes.
+     * This method collects fields from all target classes and returns their union.
+     * Fields that are the same (by fully qualified name) are only counted once.
+     * 
+     * @param classPaths List of paths to target class files
+     * @return Set of all field names from all target classes
+     */
+    private Set<String> getAllFieldsInTargetClasses(List<String> classPaths) {
+        Set<String> allFields = new HashSet<>();
+        
+        for (String classPath : classPaths) {
+            Set<String> classFields = getAllFieldsInClass(classPath);
+            allFields.addAll(classFields);
+        }
+        
+        return allFields;
     }
     
     /**
@@ -533,6 +583,26 @@ public class StateFieldCoverage implements Metric {
         findDirectFieldAccesses(rootNode, oracle, accessedFields, allFields);
         
         return accessedFields;
+    }
+    
+    /**
+     * Get the fields accessed by an oracle statement from multiple target classes.
+     * This method collects accessed fields from all target classes and returns their union.
+     * 
+     * @param testCase The full source code of the test case (method body)
+     * @param oracle The oracle (assertion statement) to assess
+     * @param classPaths List of paths to target class files
+     * @return Set of accessed field names from all target classes
+     */
+    private Set<String> getFieldsAccessedByOracleInTargetClasses(String testCase, String oracle, List<String> classPaths) {
+        Set<String> allAccessedFields = new HashSet<>();
+        
+        for (String classPath : classPaths) {
+            Set<String> classAccessedFields = getFieldsAccessedByOracle(testCase, oracle, classPath);
+            allAccessedFields.addAll(classAccessedFields);
+        }
+        
+        return allAccessedFields;
     }
     
     /**
