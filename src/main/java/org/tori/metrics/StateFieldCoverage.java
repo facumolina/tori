@@ -83,6 +83,17 @@ public class StateFieldCoverage implements Metric {
             throw new IllegalArgumentException("Configuration must contain at least one valid non-empty target class path");
         }
         
+        // Validate that all target class paths are valid Java files
+        for (String classPath : this.targetClassPaths) {
+            Path path = Paths.get(classPath);
+            if (!Files.exists(path)) {
+                throw new IllegalArgumentException("Target class file does not exist: " + classPath);
+            }
+            if (!classPath.endsWith(".java")) {
+                throw new IllegalArgumentException("Target class must be a Java file (.java extension): " + classPath);
+            }
+        }
+        
         // Configure execution level
         String execLevelValue = config.getProperty("exec_level");
         if (execLevelValue != null && !execLevelValue.isEmpty()) {
@@ -94,6 +105,9 @@ public class StateFieldCoverage implements Metric {
         if (iterableTrackingValue != null && !iterableTrackingValue.isEmpty()) {
             this.iterableFieldTrackingEnabled = Boolean.parseBoolean(iterableTrackingValue);
         }
+        
+        // Identify target fields after configuration for reporting
+        this.lastTargetFields = getAllFieldsInTargetClasses(this.targetClassPaths);
     }
     
     /**
