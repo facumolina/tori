@@ -197,4 +197,140 @@ class StateFieldCoverageTargetValidationTest {
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.key")),"Should identify RedBlackTreeNode.key field");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.left")),"Should identify RedBlackTreeNode.left field");
     }
+
+    @Test
+    void testFieldIdentification_RedBlackTree_AllFields() {
+        StateFieldCoverage metric = new StateFieldCoverage();
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
+        config.setProperty("iterable_field_tracking", "false");
+        metric.configure(config);
+
+        // Get the identified target fields
+        Set<String> targetFields = metric.getLastTargetFields();
+
+        // RedBlackTree has 4 fields: root, size, RED, BLACK
+        // RedBlackTreeNode has 6 fields: key, value, left, right, parent, color
+        // Total: 10 fields
+        assertEquals(10, targetFields.size(), "Should have 10 fields total");
+
+        // Verify all RedBlackTree fields are present
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTree.root")),
+            "Should identify RedBlackTree.root field");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTree.size")),
+            "Should identify RedBlackTree.size field");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTree.RED")),
+            "Should identify RedBlackTree.RED field");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTree.BLACK")),
+            "Should identify RedBlackTree.BLACK field");
+
+        // Verify all RedBlackTreeNode fields are present
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.key")),
+            "Should identify RedBlackTreeNode.key field");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.value")),
+            "Should identify RedBlackTreeNode.value field");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.left")),
+            "Should identify RedBlackTreeNode.left field");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.right")),
+            "Should identify RedBlackTreeNode.right field");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.parent")),
+            "Should identify RedBlackTreeNode.parent field");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.color")),
+            "Should identify RedBlackTreeNode.color field");
+    }
+
+    @Test
+    void testAssess_RedBlackTree_SizeField() {
+        StateFieldCoverage metric = new StateFieldCoverage();
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
+        config.setProperty("iterable_field_tracking", "false");
+        metric.configure(config);
+
+        // Test case that uses getSize method which accesses the size field
+        String testCase = """
+            @Test
+            public void testSize() {
+                RedBlackTree t = new RedBlackTree();
+                t.insert(10);
+                assertEquals(1, t.getSize());
+            }
+            """;
+        
+        String oracle = "assertEquals(1, t.getSize());";
+        
+        double coverage = metric.assess(testCase, oracle);
+        
+        // getSize method accesses the size field (1 out of 10 fields = 0.1)
+        assertTrue(coverage > 0.0, "Should have non-zero coverage");
+        assertEquals(0.1, coverage, 0.01, "Should cover size field (1 out of 10)");
+        
+        // Verify that size field was identified as accessed
+        Set<String> accessedFields = metric.getLastAccessedFields();
+        assertTrue(accessedFields.stream().anyMatch(f -> f.endsWith(".RedBlackTree.size")),
+            "Should have accessed RedBlackTree.size field");
+    }
+
+    @Test
+    void testAssess_RedBlackTree_VerifyMissingFields() {
+        StateFieldCoverage metric = new StateFieldCoverage();
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
+        config.setProperty("iterable_field_tracking", "false");
+        metric.configure(config);
+
+        // Simple test that only accesses size
+        String testCase = """
+            @Test
+            public void testSize() {
+                RedBlackTree t = new RedBlackTree();
+                t.insert(10);
+                assertEquals(1, t.getSize());
+            }
+            """;
+        
+        String oracle = "assertEquals(1, t.getSize());";
+        
+        double coverage = metric.assess(testCase, oracle);
+        
+        // Verify missing fields include all RedBlackTreeNode fields
+        Set<String> missingFields = metric.getLastMissingFields();
+        assertTrue(missingFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.key")),
+            "RedBlackTreeNode.key should be in missing fields");
+        assertTrue(missingFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.value")),
+            "RedBlackTreeNode.value should be in missing fields");
+        assertTrue(missingFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.left")),
+            "RedBlackTreeNode.left should be in missing fields");
+        assertTrue(missingFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.right")),
+            "RedBlackTreeNode.right should be in missing fields");
+        assertTrue(missingFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.parent")),
+            "RedBlackTreeNode.parent should be in missing fields");
+        assertTrue(missingFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.color")),
+            "RedBlackTreeNode.color should be in missing fields");
+        
+        // Should have 9 missing fields (all except size)
+        assertEquals(9, missingFields.size(), "Should have 9 missing fields");
+    }
+
+    @Test
+    void testFieldIdentification_RedBlackTree_WithIterableTracking() {
+        StateFieldCoverage metric = new StateFieldCoverage();
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
+        config.setProperty("iterable_field_tracking", "true");
+        metric.configure(config);
+
+        // Get the identified target fields
+        Set<String> targetFields = metric.getLastTargetFields();
+
+        // With iterable tracking, there may be additional fields with "+" suffix
+        // Base fields should still be 10
+        assertTrue(targetFields.size() >= 10, "Should have at least 10 base fields");
+        
+        // Verify key fields are still present (without + suffix)
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTree.root") && !f.contains("+")),
+            "Should identify RedBlackTree.root field without + suffix");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.key") && !f.contains("+")),
+            "Should identify RedBlackTreeNode.key field without + suffix");
+    }
 }
