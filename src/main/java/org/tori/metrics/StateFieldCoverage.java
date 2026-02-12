@@ -39,9 +39,9 @@ public class StateFieldCoverage implements Metric {
     private final Map<String, Set<String>> iterableFieldsCache; // Maps class path to iterable field FQNs
     private final Map<String, Set<String>> methodIterationCache; // Maps classPath.methodName to iterated field FQNs
     
-    // Dependency class tracking
-    private Set<String> lastLoadedDependencyClasses; // Classes successfully loaded
-    private Set<String> lastFailedDependencyClasses; // Classes that failed to load
+    // Dependency class tracking (external dependencies only, cleared at start of each assessment)
+    private Set<String> lastLoadedDependencyClasses; // External classes successfully loaded from separate files
+    private Set<String> lastFailedDependencyClasses; // External classes that failed to load (source file not found)
     
     public StateFieldCoverage() {
         this.javaLanguage = new TreeSitterJava();
@@ -506,12 +506,12 @@ public class StateFieldCoverage implements Metric {
             Path potentialClassPath = directory.resolve(typeName + ".java");
             if (Files.exists(potentialClassPath)) {
                 referencedPaths.add(potentialClassPath.toString());
-                // Track successfully loaded dependency (only for target classes, not for nested dependencies)
+                // Track successfully loaded dependency (only for direct dependencies of target classes, not transitive dependencies)
                 if (isRootClass) {
                     lastLoadedDependencyClasses.add(typeName);
                 }
             } else {
-                // Track failed dependency (only for target classes, not for nested dependencies)
+                // Track failed dependency (only for direct dependencies of target classes, not transitive dependencies)
                 if (isRootClass) {
                     lastFailedDependencyClasses.add(typeName);
                 }
