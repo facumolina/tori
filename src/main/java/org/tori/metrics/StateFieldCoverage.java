@@ -368,12 +368,52 @@ public class StateFieldCoverage implements Metric {
         }
         
         Set<String> fields = new HashSet<>();
+        Set<String> visitedClasses = new HashSet<>();
+        fields = getAllFieldsInClassRecursive(classPath, visitedClasses);
+        
+        classFieldsCache.put(classPath, fields);
+        return fields;
+    }
+    
+    /**
+     * Recursively get all fields defined in a class, including fields from inner classes
+     * and fields from classes used by the target class (declared in other files).
+     * If iterable field tracking is enabled, this includes both normal labels and
+     * special labels (with '+' suffix) for iterable fields.
+     * 
+     * @param classPath Path to the class file
+     * @param visitedClasses Set of already visited class paths to avoid infinite recursion
+     * @return Set of all field names
+     */
+    private Set<String> getAllFieldsInClassRecursive(String classPath, Set<String> visitedClasses) {
+        // Avoid infinite recursion
+        if (visitedClasses.contains(classPath)) {
+            return new HashSet<>();
+        }
+        visitedClasses.add(classPath);
+        
+        Set<String> fields = new HashSet<>();
         
         Path path = Paths.get(classPath);
         if (Files.exists(path)) {
             try {
                 String classSource = Files.readString(path);
                 fields = extractFieldsFromClass(classSource);
+                
+                // Extract field types to find referenced classes
+                TSTree tree = parser.parseString(null, classSource);
+                TSNode rootNode = tree.getRootNode();
+                String packageName = extractPackageName(rootNode, classSource);
+                Map<String, String> fieldTypes = extractFieldTypes(rootNode, classSource, packageName, "");
+                
+                // Find referenced classes in the same directory
+                Set<String> referencedClassPaths = findReferencedClassPaths(classPath, fieldTypes);
+                
+                // Recursively include fields from referenced classes
+                for (String referencedClassPath : referencedClassPaths) {
+                    Set<String> referencedFields = getAllFieldsInClassRecursive(referencedClassPath, visitedClasses);
+                    fields.addAll(referencedFields);
+                }
                 
                 // If iterable field tracking is enabled, add special labels for iterable fields
                 if (iterableFieldTrackingEnabled) {
@@ -390,8 +430,79 @@ public class StateFieldCoverage implements Metric {
             }
         }
         
-        classFieldsCache.put(classPath, fields);
         return fields;
+    }
+    
+    /**
+     * Find paths to classes that are referenced by field types in the given class.
+     * This identifies custom classes (not primitives or standard library classes)
+     * that are used as field types and declared in separate files in the same directory.
+     * 
+     * @param classPath Path to the class file
+     * @param fieldTypes Map of field FQN to type name
+     * @return Set of paths to referenced class files
+     */
+    private Set<String> findReferencedClassPaths(String classPath, Map<String, String> fieldTypes) {
+        Set<String> referencedPaths = new HashSet<>();
+        Path currentPath = Paths.get(classPath);
+        Path directory = currentPath.getParent();
+        
+        if (directory == null) {
+            return referencedPaths;
+        }
+        
+        // Extract unique type names (without array brackets)
+        Set<String> typeNames = new HashSet<>();
+        for (String typeName : fieldTypes.values()) {
+            // Remove array brackets if present
+            String baseTypeName = typeName.replace("[]", "");
+            
+            // Skip primitives and common standard library types
+            if (!isPrimitiveOrStandardType(baseTypeName)) {
+                typeNames.add(baseTypeName);
+            }
+        }
+        
+        // For each type, check if a corresponding .java file exists in the same directory
+        for (String typeName : typeNames) {
+            Path potentialClassPath = directory.resolve(typeName + ".java");
+            if (Files.exists(potentialClassPath)) {
+                referencedPaths.add(potentialClassPath.toString());
+            }
+        }
+        
+        return referencedPaths;
+    }
+    
+    /**
+     * Check if a type name represents a primitive type or standard library type.
+     * 
+     * @param typeName The type name to check
+     * @return true if the type is primitive or from standard library, false otherwise
+     */
+    private boolean isPrimitiveOrStandardType(String typeName) {
+        if (typeName == null || typeName.isEmpty()) {
+            return true;
+        }
+        
+        // Primitives
+        if (typeName.equals("int") || typeName.equals("long") || typeName.equals("short") ||
+            typeName.equals("byte") || typeName.equals("char") || typeName.equals("boolean") ||
+            typeName.equals("float") || typeName.equals("double") || typeName.equals("void")) {
+            return true;
+        }
+        
+        // Common standard library types
+        if (typeName.equals("String") || typeName.equals("Integer") || typeName.equals("Long") ||
+            typeName.equals("Short") || typeName.equals("Byte") || typeName.equals("Character") ||
+            typeName.equals("Boolean") || typeName.equals("Float") || typeName.equals("Double") ||
+            typeName.equals("Object") || typeName.equals("List") || typeName.equals("Set") ||
+            typeName.equals("Map") || typeName.equals("Collection") || typeName.equals("ArrayList") ||
+            typeName.equals("HashSet") || typeName.equals("HashMap")) {
+            return true;
+        }
+        
+        return false;
     }
     
     /**
