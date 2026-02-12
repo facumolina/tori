@@ -486,23 +486,21 @@ public class StateFieldCoverage implements Metric {
         }
         
         // Primitives
-        if (typeName.equals("int") || typeName.equals("long") || typeName.equals("short") ||
-            typeName.equals("byte") || typeName.equals("char") || typeName.equals("boolean") ||
-            typeName.equals("float") || typeName.equals("double") || typeName.equals("void")) {
+        Set<String> primitives = Set.of(
+            "int", "long", "short", "byte", "char", 
+            "boolean", "float", "double", "void"
+        );
+        if (primitives.contains(typeName)) {
             return true;
         }
         
         // Common standard library types
-        if (typeName.equals("String") || typeName.equals("Integer") || typeName.equals("Long") ||
-            typeName.equals("Short") || typeName.equals("Byte") || typeName.equals("Character") ||
-            typeName.equals("Boolean") || typeName.equals("Float") || typeName.equals("Double") ||
-            typeName.equals("Object") || typeName.equals("List") || typeName.equals("Set") ||
-            typeName.equals("Map") || typeName.equals("Collection") || typeName.equals("ArrayList") ||
-            typeName.equals("HashSet") || typeName.equals("HashMap")) {
-            return true;
-        }
-        
-        return false;
+        Set<String> standardTypes = Set.of(
+            "String", "Integer", "Long", "Short", "Byte", "Character",
+            "Boolean", "Float", "Double", "Object", "List", "Set",
+            "Map", "Collection", "ArrayList", "HashSet", "HashMap"
+        );
+        return standardTypes.contains(typeName);
     }
     
     /**
