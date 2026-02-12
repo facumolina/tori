@@ -152,6 +152,30 @@ public class Main {
                                 }
                             }
                             
+                            // Report dependency classes
+                            java.util.Set<String> loadedDeps = sfcMetric.getLastLoadedDependencyClasses();
+                            java.util.Set<String> failedDeps = sfcMetric.getLastFailedDependencyClasses();
+                            
+                            if (!loadedDeps.isEmpty() || !failedDeps.isEmpty()) {
+                                System.out.println("  dependency_classes:");
+                                
+                                if (!loadedDeps.isEmpty()) {
+                                    java.util.List<String> sortedLoadedDeps = new java.util.ArrayList<>(loadedDeps);
+                                    java.util.Collections.sort(sortedLoadedDeps);
+                                    for (String depClass : sortedLoadedDeps) {
+                                        System.out.println("    - " + depClass + " (loaded)");
+                                    }
+                                }
+                                
+                                if (!failedDeps.isEmpty()) {
+                                    java.util.List<String> sortedFailedDeps = new java.util.ArrayList<>(failedDeps);
+                                    java.util.Collections.sort(sortedFailedDeps);
+                                    for (String depClass : sortedFailedDeps) {
+                                        System.out.println("    - " + depClass + " (WARNING: source file not found)");
+                                    }
+                                }
+                            }
+                            
                             System.out.println("  exec_level: " + sfcMetric.getExecutionLevel().getConfigValue());
                             System.out.println("  iterable_field_tracking: " + (sfcMetric.isIterableFieldTrackingEnabled() ? "enabled" : "disabled"));
                         } else {
