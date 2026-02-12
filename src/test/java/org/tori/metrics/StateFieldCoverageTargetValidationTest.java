@@ -333,4 +333,92 @@ class StateFieldCoverageTargetValidationTest {
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.key") && !f.contains("+")),
             "Should identify RedBlackTreeNode.key field without + suffix");
     }
+
+    @Test
+    void testDependencyTracking_RedBlackTree_LoadedDependency() {
+        StateFieldCoverage metric = new StateFieldCoverage();
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
+        config.setProperty("iterable_field_tracking", "false");
+        metric.configure(config);
+
+        // Get the dependency tracking information
+        Set<String> loadedDeps = metric.getLastLoadedDependencyClasses();
+        Set<String> failedDeps = metric.getLastFailedDependencyClasses();
+
+        // RedBlackTreeNode should be loaded as a dependency
+        assertTrue(loadedDeps.contains("RedBlackTreeNode"),
+            "Should have loaded RedBlackTreeNode as a dependency");
+        
+        // There should be no failed dependencies
+        assertTrue(failedDeps.isEmpty(),
+            "Should have no failed dependencies for RedBlackTree");
+    }
+
+    @Test
+    void testDependencyTracking_IntsList_NoExternalDependencies() {
+        StateFieldCoverage metric = new StateFieldCoverage();
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/IntsList.java");
+        config.setProperty("iterable_field_tracking", "false");
+        metric.configure(config);
+
+        // Get the dependency tracking information
+        Set<String> loadedDeps = metric.getLastLoadedDependencyClasses();
+        Set<String> failedDeps = metric.getLastFailedDependencyClasses();
+
+        // IntsList uses Node which is an inner class, so no external dependencies
+        assertTrue(loadedDeps.isEmpty(),
+            "Should have no loaded external dependencies (Node is inner class)");
+        assertTrue(failedDeps.isEmpty(),
+            "Should have no failed dependencies");
+    }
+
+    @Test
+    void testDependencyTracking_MissingDependency() {
+        StateFieldCoverage metric = new StateFieldCoverage();
+        Properties config = new Properties();
+        config.setProperty("target_class", "src/test/resources/TestClassWithMissingDep.java");
+        config.setProperty("iterable_field_tracking", "false");
+        metric.configure(config);
+
+        // Get the dependency tracking information
+        Set<String> loadedDeps = metric.getLastLoadedDependencyClasses();
+        Set<String> failedDeps = metric.getLastFailedDependencyClasses();
+
+        // NonExistentClass should be reported as failed
+        assertTrue(failedDeps.contains("NonExistentClass"),
+            "Should report NonExistentClass as a failed dependency");
+        
+        // There should be no successfully loaded dependencies
+        assertTrue(loadedDeps.isEmpty(),
+            "Should have no successfully loaded dependencies");
+    }
+
+    @Test
+    void testDependencyTracking_ClearedBetweenAssessments() {
+        StateFieldCoverage metric = new StateFieldCoverage();
+        
+        // First assessment with RedBlackTree
+        Properties config1 = new Properties();
+        config1.setProperty("target_class", "src/test/resources/RedBlackTree.java");
+        config1.setProperty("iterable_field_tracking", "false");
+        metric.configure(config1);
+
+        Set<String> loadedDeps1 = metric.getLastLoadedDependencyClasses();
+        assertTrue(loadedDeps1.contains("RedBlackTreeNode"),
+            "First assessment should have RedBlackTreeNode");
+
+        // Second assessment with IntsList (which has no external dependencies)
+        Properties config2 = new Properties();
+        config2.setProperty("target_class", "src/test/resources/IntsList.java");
+        config2.setProperty("iterable_field_tracking", "false");
+        metric.configure(config2);
+
+        Set<String> loadedDeps2 = metric.getLastLoadedDependencyClasses();
+        assertTrue(loadedDeps2.isEmpty(),
+            "Second assessment should have no external dependencies");
+        assertFalse(loadedDeps2.contains("RedBlackTreeNode"),
+            "Second assessment should not have RedBlackTreeNode from first assessment");
+    }
 }

@@ -39,6 +39,10 @@ public class StateFieldCoverage implements Metric {
     private final Map<String, Set<String>> iterableFieldsCache; // Maps class path to iterable field FQNs
     private final Map<String, Set<String>> methodIterationCache; // Maps classPath.methodName to iterated field FQNs
     
+    // Dependency class tracking (external dependencies only, cleared at start of each assessment)
+    private Set<String> lastLoadedDependencyClasses; // External classes successfully loaded from separate files
+    private Set<String> lastFailedDependencyClasses; // External classes that failed to load (source file not found)
+    
     public StateFieldCoverage() {
         this.javaLanguage = new TreeSitterJava();
         this.parser = new TSParser();
@@ -53,6 +57,8 @@ public class StateFieldCoverage implements Metric {
         this.iterableFieldTrackingEnabled = true; // Enabled by default
         this.iterableFieldsCache = new HashMap<>();
         this.methodIterationCache = new HashMap<>();
+        this.lastLoadedDependencyClasses = new HashSet<>();
+        this.lastFailedDependencyClasses = new HashSet<>();
     }
     
     /**
@@ -216,6 +222,26 @@ public class StateFieldCoverage implements Metric {
     }
     
     /**
+     * Get the dependency classes that were successfully loaded.
+     * These are classes referenced by target classes that were found and included.
+     * 
+     * @return Set of dependency class names (simple names without package)
+     */
+    public Set<String> getLastLoadedDependencyClasses() {
+        return new HashSet<>(lastLoadedDependencyClasses);
+    }
+    
+    /**
+     * Get the dependency classes that failed to load.
+     * These are classes referenced by target classes but their source files could not be found.
+     * 
+     * @return Set of dependency class names that failed to load
+     */
+    public Set<String> getLastFailedDependencyClasses() {
+        return new HashSet<>(lastFailedDependencyClasses);
+    }
+    
+    /**
      * Enable or disable detailed reporting in the configure method.
      * This method should be called before configure() to prevent printing
      * during configuration. If called after configure(), it will only affect
@@ -369,7 +395,7 @@ public class StateFieldCoverage implements Metric {
         
         Set<String> fields = new HashSet<>();
         Set<String> visitedClasses = new HashSet<>();
-        fields = getAllFieldsInClassRecursive(classPath, visitedClasses);
+        fields = getAllFieldsInClassRecursive(classPath, visitedClasses, true);
         
         classFieldsCache.put(classPath, fields);
         return fields;
@@ -383,9 +409,10 @@ public class StateFieldCoverage implements Metric {
      * 
      * @param classPath Path to the class file
      * @param visitedClasses Set of already visited class paths to avoid infinite recursion
+     * @param isRootClass Whether this is a root target class (not a dependency)
      * @return Set of all field names
      */
-    private Set<String> getAllFieldsInClassRecursive(String classPath, Set<String> visitedClasses) {
+    private Set<String> getAllFieldsInClassRecursive(String classPath, Set<String> visitedClasses, boolean isRootClass) {
         // Avoid infinite recursion
         if (visitedClasses.contains(classPath)) {
             return new HashSet<>();
@@ -407,11 +434,11 @@ public class StateFieldCoverage implements Metric {
                 Map<String, String> fieldTypes = extractFieldTypes(rootNode, classSource, packageName, "");
                 
                 // Find referenced classes in the same directory
-                Set<String> referencedClassPaths = findReferencedClassPaths(classPath, fieldTypes);
+                Set<String> referencedClassPaths = findReferencedClassPaths(classPath, classSource, fieldTypes, isRootClass);
                 
-                // Recursively include fields from referenced classes
+                // Recursively include fields from referenced classes (not root anymore)
                 for (String referencedClassPath : referencedClassPaths) {
-                    Set<String> referencedFields = getAllFieldsInClassRecursive(referencedClassPath, visitedClasses);
+                    Set<String> referencedFields = getAllFieldsInClassRecursive(referencedClassPath, visitedClasses, false);
                     fields.addAll(referencedFields);
                 }
                 
@@ -437,12 +464,15 @@ public class StateFieldCoverage implements Metric {
      * Find paths to classes that are referenced by field types in the given class.
      * This identifies custom classes (not primitives or standard library classes)
      * that are used as field types and declared in separate files in the same directory.
+     * Also tracks which classes were successfully found and which were not.
      * 
      * @param classPath Path to the class file
+     * @param classSource Source code of the class (to check for inner classes)
      * @param fieldTypes Map of field FQN to type name
+     * @param isRootClass Whether this is a root target class (not a dependency)
      * @return Set of paths to referenced class files
      */
-    private Set<String> findReferencedClassPaths(String classPath, Map<String, String> fieldTypes) {
+    private Set<String> findReferencedClassPaths(String classPath, String classSource, Map<String, String> fieldTypes, boolean isRootClass) {
         Set<String> referencedPaths = new HashSet<>();
         Path currentPath = Paths.get(classPath);
         Path directory = currentPath.getParent();
@@ -450,6 +480,9 @@ public class StateFieldCoverage implements Metric {
         if (directory == null) {
             return referencedPaths;
         }
+        
+        // Extract inner class names from the source
+        Set<String> innerClassNames = extractInnerClassNames(classSource);
         
         // Extract unique type names (without array brackets)
         Set<String> typeNames = new HashSet<>();
@@ -465,9 +498,23 @@ public class StateFieldCoverage implements Metric {
         
         // For each type, check if a corresponding .java file exists in the same directory
         for (String typeName : typeNames) {
+            // Skip inner classes - they are not in separate files
+            if (innerClassNames.contains(typeName)) {
+                continue;
+            }
+            
             Path potentialClassPath = directory.resolve(typeName + ".java");
             if (Files.exists(potentialClassPath)) {
                 referencedPaths.add(potentialClassPath.toString());
+                // Track successfully loaded dependency (only for direct dependencies of target classes, not transitive dependencies)
+                if (isRootClass) {
+                    lastLoadedDependencyClasses.add(typeName);
+                }
+            } else {
+                // Track failed dependency (only for direct dependencies of target classes, not transitive dependencies)
+                if (isRootClass) {
+                    lastFailedDependencyClasses.add(typeName);
+                }
             }
         }
         
@@ -504,6 +551,57 @@ public class StateFieldCoverage implements Metric {
     }
     
     /**
+     * Extract the names of all inner classes (nested classes) defined in the given source code.
+     * 
+     * @param classSource The source code of the class
+     * @return Set of inner class names
+     */
+    private Set<String> extractInnerClassNames(String classSource) {
+        Set<String> innerClassNames = new HashSet<>();
+        
+        TSTree tree = parser.parseString(null, classSource);
+        TSNode rootNode = tree.getRootNode();
+        
+        findInnerClassNames(rootNode, classSource, innerClassNames, false);
+        
+        return innerClassNames;
+    }
+    
+    /**
+     * Recursively find all inner class names in the AST.
+     * 
+     * @param node Current node being processed
+     * @param sourceCode Source code
+     * @param innerClassNames Set to collect inner class names
+     * @param insideClass Whether we're currently inside a class declaration
+     */
+    private void findInnerClassNames(TSNode node, String sourceCode, Set<String> innerClassNames, boolean insideClass) {
+        String nodeType = node.getType();
+        
+        if ("class_declaration".equals(nodeType)) {
+            // If we're already inside a class, this is an inner class
+            if (insideClass) {
+                TSNode nameNode = node.getChildByFieldName("name");
+                if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                    int startByte = nameNode.getStartByte();
+                    int endByte = nameNode.getEndByte();
+                    String className = sourceCode.substring(startByte, endByte);
+                    innerClassNames.add(className);
+                }
+            }
+            // Now we're inside a class, recurse into it
+            insideClass = true;
+        }
+        
+        // Recursively process children
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            findInnerClassNames(child, sourceCode, innerClassNames, insideClass);
+        }
+    }
+    
+    /**
      * Get all fields defined in multiple target classes, including fields from inner classes.
      * This method collects fields from all target classes and returns their union.
      * Fields that are the same (by fully qualified name) are only counted once.
@@ -512,6 +610,10 @@ public class StateFieldCoverage implements Metric {
      * @return Set of all field names from all target classes
      */
     private Set<String> getAllFieldsInTargetClasses(List<String> classPaths) {
+        // Clear dependency tracking for fresh collection
+        lastLoadedDependencyClasses = new HashSet<>();
+        lastFailedDependencyClasses = new HashSet<>();
+        
         Set<String> allFields = new HashSet<>();
         
         for (String classPath : classPaths) {
