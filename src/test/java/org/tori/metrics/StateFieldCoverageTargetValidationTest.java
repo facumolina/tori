@@ -178,4 +178,23 @@ class StateFieldCoverageTargetValidationTest {
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".IntsList.header") && !f.contains("+")),
             "Should identify header field without + suffix");
     }
+
+    @Test
+    void testFieldIdentification_usedClassesInOtherFiles_noIterables() { 
+        StateFieldCoverage metric = new StateFieldCoverage(); 
+        Properties config = new Properties(); config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
+        config.setProperty("iterable_field_tracking", "false");
+        metric.configure(config);
+
+        // Get the identified target fields
+        Set<String> targetFields = metric.getLastTargetFields();
+
+        // RedBlackTree has 4 fields + RedBlackATreeNode has 6 fields = 10 total fields
+        assertEquals(10, targetFields.size(), "Should have 10 fields from both RedBlackTree and RedBlackATreeNode"); 
+
+        // Verify fields from both classes are present
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTree.root")),"Should identify RedBlackTree.root field");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.key")),"Should identify RedBlackTreeNode.key field");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.left")),"Should identify RedBlackTreeNode.left field");
+    }
 }
