@@ -463,7 +463,8 @@ public class StateFieldCoverage implements Metric {
     /**
      * Find paths to classes that are referenced by field types in the given class.
      * This identifies custom classes (not primitives or standard library classes)
-     * that are used as field types and declared in separate files in the same directory.
+     * that are used as field types and declared in separate files.
+     * Uses import statements and package names to resolve class paths.
      * Also tracks which classes were successfully found and which were not.
      * 
      * @param classPath Path to the class file
@@ -481,6 +482,12 @@ public class StateFieldCoverage implements Metric {
             return referencedPaths;
         }
         
+        // Extract package name and imports
+        TSTree tree = parser.parseString(null, classSource);
+        TSNode rootNode = tree.getRootNode();
+        String packageName = extractPackageName(rootNode, classSource);
+        Map<String, String> imports = extractImports(rootNode, classSource);
+        
         // Extract inner class names from the source
         Set<String> innerClassNames = extractInnerClassNames(classSource);
         
@@ -496,16 +503,16 @@ public class StateFieldCoverage implements Metric {
             }
         }
         
-        // For each type, check if a corresponding .java file exists in the same directory
+        // For each type, resolve its file path
         for (String typeName : typeNames) {
             // Skip inner classes - they are not in separate files
             if (innerClassNames.contains(typeName)) {
                 continue;
             }
             
-            Path potentialClassPath = directory.resolve(typeName + ".java");
-            if (Files.exists(potentialClassPath)) {
-                referencedPaths.add(potentialClassPath.toString());
+            String resolvedPath = resolveClassPath(typeName, packageName, imports, currentPath);
+            if (resolvedPath != null && Files.exists(Paths.get(resolvedPath))) {
+                referencedPaths.add(resolvedPath);
                 // Track successfully loaded dependency (including transitive dependencies)
                 lastLoadedDependencyClasses.add(typeName);
             } else {
@@ -688,6 +695,154 @@ public class StateFieldCoverage implements Metric {
             }
         }
         return "";
+    }
+    
+    /**
+     * Extract import statements from the AST root node.
+     * Returns a map from simple class name to fully qualified class name.
+     * For example: "ReferencedClass" -> "com.example.package2.ReferencedClass"
+     */
+    private Map<String, String> extractImports(TSNode rootNode, String sourceCode) {
+        Map<String, String> imports = new HashMap<>();
+        int childCount = rootNode.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = rootNode.getChild(i);
+            if ("import_declaration".equals(child.getType())) {
+                // Find the identifier in the import declaration
+                int importChildCount = child.getChildCount();
+                for (int j = 0; j < importChildCount; j++) {
+                    TSNode importChild = child.getChild(j);
+                    if ("scoped_identifier".equals(importChild.getType())) {
+                        int startByte = importChild.getStartByte();
+                        int endByte = importChild.getEndByte();
+                        String fullImport = sourceCode.substring(startByte, endByte);
+                        
+                        // Extract simple class name (last part after the last dot)
+                        int lastDot = fullImport.lastIndexOf('.');
+                        if (lastDot >= 0) {
+                            String simpleClassName = fullImport.substring(lastDot + 1);
+                            imports.put(simpleClassName, fullImport);
+                        }
+                    }
+                }
+            }
+        }
+        return imports;
+    }
+    
+    /**
+     * Resolve a class path based on the type name, package, and imports.
+     * 
+     * @param typeName The simple class name to resolve
+     * @param packageName The package of the current class
+     * @param imports Map of simple class names to fully qualified class names
+     * @param currentPath Path to the current class file
+     * @return Resolved file path or null if not found
+     */
+    private String resolveClassPath(String typeName, String packageName, Map<String, String> imports, Path currentPath) {
+        Path directory = currentPath.getParent();
+        if (directory == null) {
+            return null;
+        }
+        
+        // First, check if the type is explicitly imported
+        if (imports.containsKey(typeName)) {
+            String fullyQualifiedName = imports.get(typeName);
+            // Convert package name to path (e.g., "com.example.package2" -> "com/example/package2")
+            int lastDot = fullyQualifiedName.lastIndexOf('.');
+            if (lastDot < 0) {
+                // No package in the fully qualified name (default package).
+                // Default package imports are not supported in modern Java for cross-package references.
+                // Fall through to try same-package resolution instead.
+                // This is intentional to avoid path resolution issues.
+            } else {
+                String packagePath = fullyQualifiedName.substring(0, lastDot);
+                packagePath = packagePath.replace('.', '/');
+                String className = typeName + ".java";
+                
+                // Try to find the file by navigating from the current directory
+                // First, try to find the root of the source tree by going up
+                Path searchPath = findSourceRoot(directory);
+                if (searchPath != null) {
+                    Path resolvedPath = searchPath.resolve(packagePath).resolve(className);
+                    if (Files.exists(resolvedPath)) {
+                        return resolvedPath.toString();
+                    }
+                }
+                
+                // If not found via source root, try relative to current directory
+                Path relativePath = directory.resolve(packagePath).resolve(className);
+                if (Files.exists(relativePath)) {
+                    return relativePath.toString();
+                }
+            }
+        }
+        
+        // If not imported, check if it's in the same package (same directory)
+        Path samePackagePath = directory.resolve(typeName + ".java");
+        if (Files.exists(samePackagePath)) {
+            return samePackagePath.toString();
+        }
+        
+        // If the current class has a package, try to find the class in the same package root
+        if (packageName != null && !packageName.isEmpty()) {
+            // Navigate up to the source root and then down to the same package
+            Path sourceRoot = findSourceRoot(directory);
+            if (sourceRoot != null) {
+                String packagePath = packageName.replace('.', '/');
+                Path packageDir = sourceRoot.resolve(packagePath);
+                Path classPath = packageDir.resolve(typeName + ".java");
+                if (Files.exists(classPath)) {
+                    return classPath.toString();
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Find the source root directory by navigating up from the current directory.
+     * Looks for common source root markers like "java", "src", "resources", etc.
+     * 
+     * This method handles typical Java project structures like:
+     * - src/main/java
+     * - src/test/java
+     * - src/main/resources
+     * - src/test/resources
+     * 
+     * @param currentDir Current directory
+     * @return Source root directory or current directory if not found
+     */
+    private Path findSourceRoot(Path currentDir) {
+        Path dir = currentDir;
+        
+        // Navigate up looking for source root indicators
+        while (dir != null) {
+            String dirName = dir.getFileName() != null ? dir.getFileName().toString() : "";
+            
+            // Stop at common source root directories
+            if ("java".equals(dirName) || "resources".equals(dirName)) {
+                // These are typically the direct source roots (e.g., src/main/java)
+                return dir;
+            } else if ("main".equals(dirName) || "test".equals(dirName)) {
+                // These are usually under "src" in typical Maven/Gradle structures.
+                // We want to return their parent (likely "src") if it exists,
+                // otherwise just return this directory as the best guess.
+                // This handles src/main/java and src/test/java structures.
+                Path parent = dir.getParent();
+                return parent != null ? parent : dir;
+            } else if ("src".equals(dirName)) {
+                // src is a common source root in many project structures
+                return dir;
+            }
+            
+            dir = dir.getParent();
+        }
+        
+        // If no source root found, return the original directory
+        // This fallback ensures we can still attempt resolution even in non-standard structures
+        return currentDir;
     }
     
     /**
