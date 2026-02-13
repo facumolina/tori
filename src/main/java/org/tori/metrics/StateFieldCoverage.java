@@ -475,7 +475,7 @@ public class StateFieldCoverage implements Metric {
      */
     private Set<String> findReferencedClassPaths(String classPath, String classSource, Map<String, String> fieldTypes, boolean isRootClass) {
         Set<String> referencedPaths = new HashSet<>();
-        Path currentPath = Paths.get(classPath);
+        Path currentPath = Paths.get(classPath).normalize();
         Path directory = currentPath.getParent();
         
         if (directory == null) {
@@ -740,6 +740,8 @@ public class StateFieldCoverage implements Metric {
      * @return Resolved file path or null if not found
      */
     private String resolveClassPath(String typeName, String packageName, Map<String, String> imports, Path currentPath) {
+        // Normalize the current path to handle any relative components
+        currentPath = currentPath.normalize();
         Path directory = currentPath.getParent();
         if (directory == null) {
             return null;
