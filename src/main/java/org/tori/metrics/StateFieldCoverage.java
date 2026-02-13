@@ -506,15 +506,11 @@ public class StateFieldCoverage implements Metric {
             Path potentialClassPath = directory.resolve(typeName + ".java");
             if (Files.exists(potentialClassPath)) {
                 referencedPaths.add(potentialClassPath.toString());
-                // Track successfully loaded dependency (only for direct dependencies of target classes, not transitive dependencies)
-                if (isRootClass) {
-                    lastLoadedDependencyClasses.add(typeName);
-                }
+                // Track successfully loaded dependency (including transitive dependencies)
+                lastLoadedDependencyClasses.add(typeName);
             } else {
-                // Track failed dependency (only for direct dependencies of target classes, not transitive dependencies)
-                if (isRootClass) {
-                    lastFailedDependencyClasses.add(typeName);
-                }
+                // Track failed dependency (including transitive dependencies)
+                lastFailedDependencyClasses.add(typeName);
             }
         }
         
