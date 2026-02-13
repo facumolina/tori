@@ -749,24 +749,32 @@ public class StateFieldCoverage implements Metric {
         if (imports.containsKey(typeName)) {
             String fullyQualifiedName = imports.get(typeName);
             // Convert package name to path (e.g., "com.example.package2" -> "com/example/package2")
-            String packagePath = fullyQualifiedName.substring(0, fullyQualifiedName.lastIndexOf('.'));
-            packagePath = packagePath.replace('.', '/');
-            String className = typeName + ".java";
-            
-            // Try to find the file by navigating from the current directory
-            // First, try to find the root of the source tree by going up
-            Path searchPath = findSourceRoot(directory);
-            if (searchPath != null) {
-                Path resolvedPath = searchPath.resolve(packagePath).resolve(className);
-                if (Files.exists(resolvedPath)) {
-                    return resolvedPath.toString();
+            int lastDot = fullyQualifiedName.lastIndexOf('.');
+            if (lastDot < 0) {
+                // No package in the fully qualified name (default package).
+                // Default package imports are not supported in modern Java for cross-package references.
+                // Fall through to try same-package resolution instead.
+                // This is intentional to avoid path resolution issues.
+            } else {
+                String packagePath = fullyQualifiedName.substring(0, lastDot);
+                packagePath = packagePath.replace('.', '/');
+                String className = typeName + ".java";
+                
+                // Try to find the file by navigating from the current directory
+                // First, try to find the root of the source tree by going up
+                Path searchPath = findSourceRoot(directory);
+                if (searchPath != null) {
+                    Path resolvedPath = searchPath.resolve(packagePath).resolve(className);
+                    if (Files.exists(resolvedPath)) {
+                        return resolvedPath.toString();
+                    }
                 }
-            }
-            
-            // If not found via source root, try relative to current directory
-            Path relativePath = directory.resolve(packagePath).resolve(className);
-            if (Files.exists(relativePath)) {
-                return relativePath.toString();
+                
+                // If not found via source root, try relative to current directory
+                Path relativePath = directory.resolve(packagePath).resolve(className);
+                if (Files.exists(relativePath)) {
+                    return relativePath.toString();
+                }
             }
         }
         
@@ -797,6 +805,12 @@ public class StateFieldCoverage implements Metric {
      * Find the source root directory by navigating up from the current directory.
      * Looks for common source root markers like "java", "src", "resources", etc.
      * 
+     * This method handles typical Java project structures like:
+     * - src/main/java
+     * - src/test/java
+     * - src/main/resources
+     * - src/test/resources
+     * 
      * @param currentDir Current directory
      * @return Source root directory or current directory if not found
      */
@@ -804,30 +818,30 @@ public class StateFieldCoverage implements Metric {
         Path dir = currentDir;
         
         // Navigate up looking for source root indicators
-        while (dir != null && dir.getParent() != null) {
-            String dirName = dir.getFileName().toString();
+        while (dir != null) {
+            String dirName = dir.getFileName() != null ? dir.getFileName().toString() : "";
             
-            // If we're in a package-like directory (all lowercase, no special meaning)
-            // continue going up
             // Stop at common source root directories
-            if ("java".equals(dirName) || "src".equals(dirName) || "resources".equals(dirName) || 
-                "main".equals(dirName) || "test".equals(dirName)) {
-                // Found a source root, return the parent of it or itself based on structure
-                if ("java".equals(dirName) || "resources".equals(dirName)) {
-                    return dir;
-                } else if ("main".equals(dirName) || "test".equals(dirName)) {
-                    // These are usually under "src", but return the parent
-                    return dir.getParent();
-                } else if ("src".equals(dirName)) {
-                    // Could be src/main/java or src/resources, check children
-                    return dir;
-                }
+            if ("java".equals(dirName) || "resources".equals(dirName)) {
+                // These are typically the direct source roots (e.g., src/main/java)
+                return dir;
+            } else if ("main".equals(dirName) || "test".equals(dirName)) {
+                // These are usually under "src" in typical Maven/Gradle structures.
+                // We want to return their parent (likely "src") if it exists,
+                // otherwise just return this directory as the best guess.
+                // This handles src/main/java and src/test/java structures.
+                Path parent = dir.getParent();
+                return parent != null ? parent : dir;
+            } else if ("src".equals(dirName)) {
+                // src is a common source root in many project structures
+                return dir;
             }
             
             dir = dir.getParent();
         }
         
         // If no source root found, return the original directory
+        // This fallback ensures we can still attempt resolution even in non-standard structures
         return currentDir;
     }
     
