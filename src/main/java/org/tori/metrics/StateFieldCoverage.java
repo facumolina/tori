@@ -442,6 +442,17 @@ public class StateFieldCoverage implements Metric {
                     fields.addAll(referencedFields);
                 }
                 
+                // Include fields from parent class (inheritance chain)
+                String superclassName = findTopLevelSuperclassName(rootNode, classSource);
+                if (superclassName != null) {
+                    Map<String, String> imports = extractImports(rootNode, classSource);
+                    String parentClassPath = resolveClassPath(superclassName, packageName, imports, path.normalize());
+                    if (parentClassPath != null) {
+                        Set<String> parentFields = getAllFieldsInClassRecursive(parentClassPath, visitedClasses, false);
+                        fields.addAll(parentFields);
+                    }
+                }
+                
                 // If iterable field tracking is enabled, add special labels for iterable fields
                 if (iterableFieldTrackingEnabled) {
                     Set<String> iterableFields = identifyIterableFields(classPath, classSource, fields);
@@ -458,6 +469,35 @@ public class StateFieldCoverage implements Metric {
         }
         
         return fields;
+    }
+    
+    /**
+     * Find the superclass name declared in the top-level class of the given source code.
+     * Returns null if the class has no explicit superclass.
+     */
+    private String findTopLevelSuperclassName(TSNode rootNode, String sourceCode) {
+        int childCount = rootNode.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = rootNode.getChild(i);
+            if ("class_declaration".equals(child.getType())) {
+                try {
+                    TSNode superclassNode = child.getChildByFieldName("superclass");
+                    if (superclassNode != null) {
+                        int superChildCount = superclassNode.getChildCount();
+                        for (int j = 0; j < superChildCount; j++) {
+                            TSNode superChild = superclassNode.getChild(j);
+                            if ("type_identifier".equals(superChild.getType())) {
+                                return sourceCode.substring(superChild.getStartByte(), superChild.getEndByte());
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // No superclass or unable to extract it
+                }
+                return null; // Found the class declaration but no superclass
+            }
+        }
+        return null;
     }
     
     /**
@@ -1100,14 +1140,18 @@ public class StateFieldCoverage implements Metric {
      * This analyzes the method body to determine which fields are accessed.
      * If multiple methods with the same name exist (e.g., in different classes),
      * we return the union of fields accessed by all of them.
+     * If the method is not defined in the given class, the parent class (via
+     * the extends clause) is checked recursively.
      */
     private Set<String> getFieldsAccessedByMethod(String classPath, String methodName) {
-        String cacheKey = classPath + "." + methodName;
-        
         if (methodFieldAccessCache.containsKey(classPath) && 
             methodFieldAccessCache.get(classPath).containsKey(methodName)) {
             return methodFieldAccessCache.get(classPath).get(methodName);
         }
+        
+        // Cache an empty set before recursing to guard against circular inheritance
+        methodFieldAccessCache.computeIfAbsent(classPath, k -> new HashMap<>())
+            .put(methodName, new HashSet<>());
         
         Set<String> accessedFields = new HashSet<>();
         
@@ -1115,15 +1159,34 @@ public class StateFieldCoverage implements Metric {
         if (Files.exists(path)) {
             try {
                 String classSource = Files.readString(path);
-                accessedFields = extractFieldAccessFromAllMethodsNamed(classSource, methodName);
+                TSTree tree = parser.parseString(null, classSource);
+                TSNode rootNode = tree.getRootNode();
+                String packageName = extractPackageName(rootNode, classSource);
+                
+                // Check if the method is defined in this class
+                List<MethodContext> methods = findAllMethodsWithClassContext(
+                        rootNode, classSource, methodName, packageName, "");
+                if (!methods.isEmpty()) {
+                    accessedFields = extractFieldAccessFromAllMethodsNamed(classSource, methodName);
+                } else {
+                    // Method not defined here; look in the parent class
+                    String superclassName = findTopLevelSuperclassName(rootNode, classSource);
+                    if (superclassName != null) {
+                        Map<String, String> imports = extractImports(rootNode, classSource);
+                        String parentClassPath = resolveClassPath(
+                                superclassName, packageName, imports, path.normalize());
+                        if (parentClassPath != null && Files.exists(Paths.get(parentClassPath))) {
+                            accessedFields = getFieldsAccessedByMethod(parentClassPath, methodName);
+                        }
+                    }
+                }
             } catch (IOException e) {
                 // Failed to read class file
             }
         }
         
-        // Cache the result
-        methodFieldAccessCache.computeIfAbsent(classPath, k -> new HashMap<>())
-            .put(methodName, accessedFields);
+        // Update cache with the actual result
+        methodFieldAccessCache.get(classPath).put(methodName, accessedFields);
         
         return accessedFields;
     }
