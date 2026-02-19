@@ -762,20 +762,24 @@ public class StateFieldCoverage implements Metric {
                 packagePath = packagePath.replace('.', '/');
                 String className = typeName + ".java";
                 
-                // Try to find the file by navigating from the current directory
-                // First, try to find the root of the source tree by going up
-                Path searchPath = findSourceRoot(directory);
-                if (searchPath != null) {
-                    Path resolvedPath = searchPath.resolve(packagePath).resolve(className);
+                // Try to compute source root from the package name (most reliable method).
+                // This works by navigating up from the current directory by the number of
+                // package components, e.g. for package "com.example.pkg" we go up 3 levels.
+                Path packageBasedRoot = computeSourceRootFromPackage(directory, packageName);
+                if (packageBasedRoot != null) {
+                    Path resolvedPath = packageBasedRoot.resolve(packagePath).resolve(className);
                     if (Files.exists(resolvedPath)) {
                         return resolvedPath.toString();
                     }
                 }
                 
-                // If not found via source root, try relative to current directory
-                Path relativePath = directory.resolve(packagePath).resolve(className);
-                if (Files.exists(relativePath)) {
-                    return relativePath.toString();
+                // Fall back to heuristic source root detection for non-standard structures
+                Path heuristicRoot = findSourceRoot(directory);
+                if (heuristicRoot != null && !heuristicRoot.equals(packageBasedRoot)) {
+                    Path resolvedPath = heuristicRoot.resolve(packagePath).resolve(className);
+                    if (Files.exists(resolvedPath)) {
+                        return resolvedPath.toString();
+                    }
                 }
             }
         }
@@ -788,12 +792,10 @@ public class StateFieldCoverage implements Metric {
         
         // If the current class has a package, try to find the class in the same package root
         if (packageName != null && !packageName.isEmpty()) {
-            // Navigate up to the source root and then down to the same package
-            Path sourceRoot = findSourceRoot(directory);
+            Path sourceRoot = computeSourceRootFromPackage(directory, packageName);
             if (sourceRoot != null) {
                 String packagePath = packageName.replace('.', '/');
-                Path packageDir = sourceRoot.resolve(packagePath);
-                Path classPath = packageDir.resolve(typeName + ".java");
+                Path classPath = sourceRoot.resolve(packagePath).resolve(typeName + ".java");
                 if (Files.exists(classPath)) {
                     return classPath.toString();
                 }
@@ -801,6 +803,42 @@ public class StateFieldCoverage implements Metric {
         }
         
         return null;
+    }
+    
+    /**
+     * Compute the source root by navigating up from the current directory, verifying that
+     * each directory name matches the corresponding package component in reverse order.
+     * For example, if the package is "com.example.pkg" (3 components) and the current
+     * directory is "/path/to/com/example/pkg", this method returns "/path/to" as the
+     * source root (verifying "pkg" == "pkg", "example" == "example", "com" == "com").
+     * 
+     * This is more reliable than heuristic-based approaches when the directory structure
+     * follows the standard Java convention of mirroring the package hierarchy.
+     * 
+     * @param directory The current directory containing the source file
+     * @param packageName The package declared in the source file
+     * @return The computed source root, or null if the package name is empty, the path
+     *         does not have enough ancestors, or the directory names do not match the
+     *         package components
+     */
+    private Path computeSourceRootFromPackage(Path directory, String packageName) {
+        if (packageName == null || packageName.isEmpty()) {
+            return null;
+        }
+        String[] parts = packageName.split("\\.");
+        Path sourceRoot = directory;
+        for (int i = parts.length - 1; i >= 0; i--) {
+            if (sourceRoot == null) {
+                return null;
+            }
+            String dirName = sourceRoot.getFileName() != null ? sourceRoot.getFileName().toString() : "";
+            if (!parts[i].equals(dirName)) {
+                // Directory structure does not match the package hierarchy
+                return null;
+            }
+            sourceRoot = sourceRoot.getParent();
+        }
+        return sourceRoot;
     }
     
     /**
