@@ -1660,12 +1660,17 @@ public class StateFieldCoverage implements Metric {
         Map<String, String> fieldTypes = extractFieldTypes(rootNode, classSource, packageName, "");
         
         // Identify recursive fields and classes with recursive fields
+        // Only consider fields present in allFields (respects includeStaticFields filter)
         Set<String> recursiveFields = new HashSet<>();
         Set<String> classesWithRecursiveFields = new HashSet<>();
         
         for (Map.Entry<String, String> entry : fieldTypes.entrySet()) {
             String fieldFQN = entry.getKey();
             String fieldType = entry.getValue();
+            
+            if (!allFields.contains(fieldFQN)) {
+                continue;
+            }
             
             // Check if field is recursive (type matches its containing class)
             if (isRecursiveField(fieldFQN, fieldType)) {
@@ -1676,9 +1681,14 @@ public class StateFieldCoverage implements Metric {
         }
         
         // Classify fields as iterable
+        // Only consider fields present in allFields (respects includeStaticFields filter)
         for (Map.Entry<String, String> entry : fieldTypes.entrySet()) {
             String fieldFQN = entry.getKey();
             String fieldType = entry.getValue();
+            
+            if (!allFields.contains(fieldFQN)) {
+                continue;
+            }
             
             // Check if field is a collection type
             if (isCollectionType(fieldType)) {
