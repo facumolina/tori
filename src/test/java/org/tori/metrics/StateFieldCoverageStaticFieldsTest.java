@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class StateFieldCoverageStaticFieldsTest {
 
     private static final String TARGET_CLASS = "src/test/resources/ClassWithStaticFields.java";
+    private static final String TARGET_CLASS_ITERABLE = "src/test/resources/ClassWithStaticIterableField.java";
 
     private StateFieldCoverage createMetric(boolean includeStaticFields) {
         StateFieldCoverage metric = new StateFieldCoverage();
@@ -23,6 +24,17 @@ class StateFieldCoverageStaticFieldsTest {
         Properties config = new Properties();
         config.setProperty("target_class", TARGET_CLASS);
         config.setProperty("iterable_field_tracking", "false");
+        config.setProperty("include_static_fields", String.valueOf(includeStaticFields));
+        metric.configure(config);
+        return metric;
+    }
+
+    private StateFieldCoverage createIterableMetric(boolean includeStaticFields) {
+        StateFieldCoverage metric = new StateFieldCoverage();
+        metric.setDetailedReportingEnabled(false);
+        Properties config = new Properties();
+        config.setProperty("target_class", TARGET_CLASS_ITERABLE);
+        config.setProperty("iterable_field_tracking", "true");
         config.setProperty("include_static_fields", String.valueOf(includeStaticFields));
         metric.configure(config);
         return metric;
@@ -170,5 +182,44 @@ class StateFieldCoverageStaticFieldsTest {
         // 4 total fields (2 static + 2 instance), 1 accessed (instanceValue) => score = 0.25
         assertEquals(0.25, score, 0.01,
                 "Should be 0.25 when one instance field is accessed out of 4 total fields");
+    }
+
+    @Test
+    void testIterableTracking_staticIterableFieldExcludedByDefault() {
+        // ClassWithStaticIterableField has:
+        // - Static field: staticItems (List<String>) => iterable
+        // - Instance fields: instanceItems (List<String>) => iterable, size (int)
+        // With include_static_fields=false and iterable_field_tracking=true:
+        // Targets should be: instanceItems, instanceItems+, size (NOT staticItems or staticItems+)
+        StateFieldCoverage metric = createIterableMetric(false);
+
+        Set<String> targetFields = metric.getLastTargetFields();
+
+        assertFalse(targetFields.stream().anyMatch(f -> f.contains("staticItems")),
+                "staticItems should NOT be in target fields when include_static_fields=false");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("instanceItems")),
+                "instanceItems should be in target fields");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("instanceItems+")),
+                "instanceItems+ should be in target fields (iterable label)");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("size")),
+                "size should be in target fields");
+    }
+
+    @Test
+    void testIterableTracking_staticIterableFieldIncludedWhenEnabled() {
+        // With include_static_fields=true and iterable_field_tracking=true:
+        // Targets should include: staticItems, staticItems+, instanceItems, instanceItems+, size
+        StateFieldCoverage metric = createIterableMetric(true);
+
+        Set<String> targetFields = metric.getLastTargetFields();
+
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("staticItems")),
+                "staticItems should be in target fields when include_static_fields=true");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("staticItems+")),
+                "staticItems+ should be in target fields when include_static_fields=true");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("instanceItems")),
+                "instanceItems should be in target fields");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("instanceItems+")),
+                "instanceItems+ should be in target fields (iterable label)");
     }
 }
