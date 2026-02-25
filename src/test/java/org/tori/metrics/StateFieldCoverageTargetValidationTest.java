@@ -189,8 +189,9 @@ class StateFieldCoverageTargetValidationTest {
         // Get the identified target fields
         Set<String> targetFields = metric.getLastTargetFields();
 
-        // RedBlackTree has 4 fields + RedBlackATreeNode has 6 fields = 10 total fields
-        assertEquals(10, targetFields.size(), "Should have 10 fields from both RedBlackTree and RedBlackATreeNode"); 
+        // RedBlackTree has 2 non-static fields (root, size) + RedBlackTreeNode has 6 fields = 8 total fields
+        // Static fields (RED, BLACK) are excluded by default (include_static_fields=false)
+        assertEquals(8, targetFields.size(), "Should have 8 fields from both RedBlackTree and RedBlackATreeNode"); 
 
         // Verify fields from both classes are present
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith(".RedBlackTree.root")),"Should identify RedBlackTree.root field");
@@ -204,12 +205,13 @@ class StateFieldCoverageTargetValidationTest {
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
         config.setProperty("iterable_field_tracking", "false");
+        config.setProperty("include_static_fields", "true");
         metric.configure(config);
 
         // Get the identified target fields
         Set<String> targetFields = metric.getLastTargetFields();
 
-        // RedBlackTree has 4 fields: root, size, RED, BLACK
+        // RedBlackTree has 4 fields: root, size, RED, BLACK (static fields included explicitly)
         // RedBlackTreeNode has 6 fields: key, value, left, right, parent, color
         // Total: 10 fields
         assertEquals(10, targetFields.size(), "Should have 10 fields total");
@@ -261,9 +263,10 @@ class StateFieldCoverageTargetValidationTest {
         
         double coverage = metric.assess(testCase, oracle);
         
-        // getSize method accesses the size field (1 out of 10 fields = 0.1)
+        // getSize method accesses the size field (1 out of 8 non-static fields = 0.125)
+        // Static fields (RED, BLACK) are excluded by default (include_static_fields=false)
         assertTrue(coverage > 0.0, "Should have non-zero coverage");
-        assertEquals(0.1, coverage, 0.01, "Should cover size field (1 out of 10)");
+        assertEquals(0.125, coverage, 0.01, "Should cover size field (1 out of 8)");
         
         // Verify that size field was identified as accessed
         Set<String> accessedFields = metric.getLastAccessedFields();
@@ -308,8 +311,8 @@ class StateFieldCoverageTargetValidationTest {
         assertTrue(missingFields.stream().anyMatch(f -> f.endsWith(".RedBlackTreeNode.color")),
             "RedBlackTreeNode.color should be in missing fields");
         
-        // Should have 9 missing fields (all except size)
-        assertEquals(9, missingFields.size(), "Should have 9 missing fields");
+        // Should have 7 missing fields (all except size; static fields RED and BLACK excluded by default)
+        assertEquals(7, missingFields.size(), "Should have 7 missing fields");
     }
 
     @Test

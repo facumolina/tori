@@ -39,6 +39,9 @@ public class StateFieldCoverage implements Metric {
     private final Map<String, Set<String>> iterableFieldsCache; // Maps class path to iterable field FQNs
     private final Map<String, Set<String>> methodIterationCache; // Maps classPath.methodName to iterated field FQNs
     
+    // Static field inclusion
+    private boolean includeStaticFields;
+    
     // Dependency class tracking (external dependencies only, cleared at start of each assessment)
     private Set<String> lastLoadedDependencyClasses; // External classes successfully loaded from separate files
     private Set<String> lastFailedDependencyClasses; // External classes that failed to load (source file not found)
@@ -57,6 +60,7 @@ public class StateFieldCoverage implements Metric {
         this.iterableFieldTrackingEnabled = true; // Enabled by default
         this.iterableFieldsCache = new HashMap<>();
         this.methodIterationCache = new HashMap<>();
+        this.includeStaticFields = false; // Disabled by default
         this.lastLoadedDependencyClasses = new HashSet<>();
         this.lastFailedDependencyClasses = new HashSet<>();
     }
@@ -111,6 +115,16 @@ public class StateFieldCoverage implements Metric {
         if (iterableTrackingValue != null && !iterableTrackingValue.isEmpty()) {
             this.iterableFieldTrackingEnabled = Boolean.parseBoolean(iterableTrackingValue);
         }
+        
+        // Configure static field inclusion
+        String includeStaticFieldsValue = config.getProperty("include_static_fields");
+        if (includeStaticFieldsValue != null && !includeStaticFieldsValue.isEmpty()) {
+            this.includeStaticFields = Boolean.parseBoolean(includeStaticFieldsValue);
+        }
+        
+        // Clear caches to ensure fresh computation with new configuration
+        this.classFieldsCache.clear();
+        this.methodFieldAccessCache.clear();
         
         // Identify target fields after configuration for reporting
         this.lastTargetFields = getAllFieldsInTargetClasses(this.targetClassPaths);
@@ -219,6 +233,15 @@ public class StateFieldCoverage implements Metric {
      */
     public boolean isIterableFieldTrackingEnabled() {
         return iterableFieldTrackingEnabled;
+    }
+    
+    /**
+     * Check if static fields are included in coverage computation.
+     * 
+     * @return true if static fields are included, false otherwise
+     */
+    public boolean isIncludeStaticFieldsEnabled() {
+        return includeStaticFields;
     }
     
     /**
@@ -990,9 +1013,14 @@ public class StateFieldCoverage implements Metric {
     /**
      * Extract field names from a field declaration node with fully qualified context.
      * Stores fields as: package.class.field_name
+     * If includeStaticFields is false, static fields are skipped.
      */
     private void extractFieldNamesWithContext(TSNode declarationNode, String sourceCode, Set<String> fields,
                                               String packageName, String classContext) {
+        // Skip static fields when not configured to include them
+        if (!includeStaticFields && isStaticField(declarationNode, sourceCode)) {
+            return;
+        }
         int childCount = declarationNode.getChildCount();
         for (int i = 0; i < childCount; i++) {
             TSNode child = declarationNode.getChild(i);
@@ -1010,6 +1038,32 @@ public class StateFieldCoverage implements Metric {
                 }
             }
         }
+    }
+    
+    /**
+     * Check if a field declaration node has the 'static' modifier.
+     * 
+     * @param declarationNode The field_declaration TSNode
+     * @param sourceCode The source code string
+     * @return true if the field has a 'static' modifier, false otherwise
+     */
+    private boolean isStaticField(TSNode declarationNode, String sourceCode) {
+        int childCount = declarationNode.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = declarationNode.getChild(i);
+            if ("modifiers".equals(child.getType())) {
+                int modChildCount = child.getChildCount();
+                for (int j = 0; j < modChildCount; j++) {
+                    TSNode modChild = child.getChild(j);
+                    int startByte = modChild.getStartByte();
+                    int endByte = modChild.getEndByte();
+                    if (endByte > startByte && "static".equals(sourceCode.substring(startByte, endByte))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
     
     /**
