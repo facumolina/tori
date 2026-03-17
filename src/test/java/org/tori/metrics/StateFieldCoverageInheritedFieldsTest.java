@@ -57,12 +57,20 @@ class StateFieldCoverageInheritedFieldsTest {
         // Three fields total across the hierarchy
         assertEquals(3, targetFields.size(),
                 "Target fields should include childField, parentField, and secondParentField");
-        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("childField")),
-                "Should contain ChildClass.childField");
-        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("parentField")),
-                "Should contain ParentClass.parentField");
-        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("secondParentField")),
-                "Should contain SecondParentClass.secondParentField");
+
+        // All field FQNs must use the concrete class name "ChildClass", never a parent class name
+        assertTrue(targetFields.stream().allMatch(f -> f.contains("ChildClass")),
+                "All target field FQNs should use the concrete class name 'ChildClass'");
+        assertFalse(targetFields.stream().anyMatch(f -> f.contains("ParentClass") || f.contains("SecondParentClass")),
+                "Target fields must not reference abstract/parent class names");
+
+        // Individual field checks using the concrete class prefix
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ChildClass.childField")),
+                "Should contain ChildClass.childField (own field)");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ChildClass.parentField")),
+                "Should contain ChildClass.parentField (inherited – not ParentClass.parentField)");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ChildClass.secondParentField")),
+                "Should contain ChildClass.secondParentField (inherited – not SecondParentClass.secondParentField)");
     }
 
     @Test
@@ -101,8 +109,8 @@ class StateFieldCoverageInheritedFieldsTest {
                 "Should cover 1/3 fields when a parent class field is accessed via its getter");
 
         Set<String> accessed = metric.getLastAccessedFields();
-        assertTrue(accessed.stream().anyMatch(f -> f.endsWith("parentField")),
-                "parentField should be in accessed fields");
+        assertTrue(accessed.stream().anyMatch(f -> f.endsWith("ChildClass.parentField")),
+                "parentField should be in accessed fields as ChildClass.parentField (not ParentClass.parentField)");
     }
 
     @Test
@@ -123,8 +131,8 @@ class StateFieldCoverageInheritedFieldsTest {
                 "Should cover 1/3 fields when a second-level parent class field is accessed");
 
         Set<String> accessed = metric.getLastAccessedFields();
-        assertTrue(accessed.stream().anyMatch(f -> f.endsWith("secondParentField")),
-                "secondParentField should be in accessed fields");
+        assertTrue(accessed.stream().anyMatch(f -> f.endsWith("ChildClass.secondParentField")),
+                "secondParentField should be in accessed fields as ChildClass.secondParentField");
     }
 
     @Test
