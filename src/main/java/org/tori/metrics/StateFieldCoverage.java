@@ -436,6 +436,25 @@ public class StateFieldCoverage implements Metric {
      * @return Set of all field names
      */
     private Set<String> getAllFieldsInClassRecursive(String classPath, Set<String> visitedClasses, boolean isRootClass) {
+        return getAllFieldsInClassRecursive(classPath, visitedClasses, isRootClass, null, null);
+    }
+
+    /**
+     * Recursively get all fields defined in a class. When {@code concreteClassName} is non-null,
+     * fields from this class (and any further ancestor classes) are renamed to use the concrete
+     * class name instead of the actual (potentially abstract) class name. This ensures that
+     * inherited fields are attributed to the instantiatable (concrete) class.
+     *
+     * @param classPath            Path to the class file
+     * @param visitedClasses       Set of already visited class paths to avoid infinite recursion
+     * @param isRootClass          Whether this is a root target class (not a dependency)
+     * @param concreteClassName    Simple name of the concrete class to use for field naming, or
+     *                             null to use the class's own name
+     * @param concretePackageName  Package name of the concrete class, or null
+     * @return Set of all field names
+     */
+    private Set<String> getAllFieldsInClassRecursive(String classPath, Set<String> visitedClasses, boolean isRootClass,
+                                                      String concreteClassName, String concretePackageName) {
         // Avoid infinite recursion
         if (visitedClasses.contains(classPath)) {
             return new HashSet<>();
@@ -448,30 +467,50 @@ public class StateFieldCoverage implements Metric {
         if (Files.exists(path)) {
             try {
                 String classSource = Files.readString(path);
-                fields = extractFieldsFromClass(classSource);
-                
+
                 // Extract field types to find referenced classes
                 TSTree tree = parser.parseString(null, classSource);
                 TSNode rootNode = tree.getRootNode();
                 String packageName = extractPackageName(rootNode, classSource);
+
+                if (concreteClassName != null) {
+                    // Inherited class: use the concrete (non-abstract) class name for field FQNs
+                    fields = extractFieldsFromClassWithOverride(classSource, concreteClassName, concretePackageName);
+                } else {
+                    // Root class or dependency class: use the class's own name for field FQNs
+                    fields = extractFieldsFromClass(classSource);
+                }
+
+                // Determine the concrete class name to propagate to parent classes
+                String classNameForParent = concreteClassName;
+                String packageNameForParent = concretePackageName;
+                if (isRootClass) {
+                    // Propagate this class's own name to any ancestor classes
+                    classNameForParent = findTopLevelClassName(rootNode, classSource);
+                    packageNameForParent = packageName;
+                }
+
                 Map<String, String> fieldTypes = extractFieldTypes(rootNode, classSource, packageName, "");
                 
                 // Find referenced classes in the same directory
                 Set<String> referencedClassPaths = findReferencedClassPaths(classPath, classSource, fieldTypes, isRootClass);
                 
-                // Recursively include fields from referenced classes (not root anymore)
+                // Recursively include fields from referenced classes (not root anymore, no name override)
                 for (String referencedClassPath : referencedClassPaths) {
                     Set<String> referencedFields = getAllFieldsInClassRecursive(referencedClassPath, visitedClasses, false);
                     fields.addAll(referencedFields);
                 }
                 
-                // Include fields from parent class (inheritance chain)
+                // Include fields from parent class (inheritance chain), propagating concrete class name
+                // (classNameForParent may be null for dependency classes, in which case the parent
+                // class fields use the parent's own name – matching the original behaviour)
                 String superclassName = findTopLevelSuperclassName(rootNode, classSource);
                 if (superclassName != null) {
                     Map<String, String> imports = extractImports(rootNode, classSource);
                     String parentClassPath = resolveClassPath(superclassName, packageName, imports, path.normalize());
                     if (parentClassPath != null) {
-                        Set<String> parentFields = getAllFieldsInClassRecursive(parentClassPath, visitedClasses, false);
+                        Set<String> parentFields = getAllFieldsInClassRecursive(parentClassPath, visitedClasses, false,
+                                classNameForParent, packageNameForParent);
                         fields.addAll(parentFields);
                     }
                 }
@@ -523,6 +562,25 @@ public class StateFieldCoverage implements Metric {
         return null;
     }
     
+    /**
+     * Find the name of the top-level class declared in the given source code.
+     * Returns null if no class declaration is found.
+     */
+    private String findTopLevelClassName(TSNode rootNode, String sourceCode) {
+        int childCount = rootNode.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = rootNode.getChild(i);
+            if ("class_declaration".equals(child.getType())) {
+                TSNode nameNode = child.getChildByFieldName("name");
+                if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                    return sourceCode.substring(nameNode.getStartByte(), nameNode.getEndByte());
+                }
+                return null;
+            }
+        }
+        return null;
+    }
+
     /**
      * Find paths to classes that are referenced by field types in the given class.
      * This identifies custom classes (not primitives or standard library classes)
@@ -708,7 +766,79 @@ public class StateFieldCoverage implements Metric {
         
         return fields;
     }
-    
+
+    /**
+     * Extract all fields from a class source file, but substitute {@code overrideClassName}
+     * (and {@code overridePackageName}) in place of the top-level class name when building
+     * fully-qualified field names. This is used so that fields inherited from an abstract
+     * parent class are attributed to the concrete (instantiatable) child class.
+     *
+     * @param classSource        Source code of the (parent/abstract) class
+     * @param overrideClassName  Simple class name to use instead of the actual class name
+     * @param overridePackageName Package name of the concrete class to use for FQN construction
+     * @return Set of field FQNs using the override class name
+     */
+    private Set<String> extractFieldsFromClassWithOverride(String classSource, String overrideClassName,
+                                                            String overridePackageName) {
+        Set<String> fields = new HashSet<>();
+
+        TSTree tree = parser.parseString(null, classSource);
+        TSNode rootNode = tree.getRootNode();
+
+        // Use the provided package name (from the concrete child class)
+        String packageName = overridePackageName != null ? overridePackageName
+                : extractPackageName(rootNode, classSource);
+
+        findFieldDeclarationsWithContextOverride(rootNode, classSource, fields, packageName, "", overrideClassName);
+
+        return fields;
+    }
+
+    /**
+     * Like {@link #findFieldDeclarationsWithContext} but substitutes {@code topLevelClassNameOverride}
+     * for the top-level class name. Inner class names are kept as-is.
+     */
+    private void findFieldDeclarationsWithContextOverride(TSNode node, String sourceCode, Set<String> fields,
+                                                           String packageName, String classContext,
+                                                           String topLevelClassNameOverride) {
+        String nodeType = node.getType();
+
+        if ("class_declaration".equals(nodeType)) {
+            TSNode nameNode = node.getChildByFieldName("name");
+            if (nameNode != null && "identifier".equals(nameNode.getType())) {
+                int startByte = nameNode.getStartByte();
+                int endByte = nameNode.getEndByte();
+
+                // Use override only for the outermost class; inner classes keep their actual names
+                String className = (classContext.isEmpty() && topLevelClassNameOverride != null)
+                        ? topLevelClassNameOverride
+                        : sourceCode.substring(startByte, endByte);
+
+                String newClassContext = classContext.isEmpty() ? className : classContext + "." + className;
+
+                int childCount = node.getChildCount();
+                for (int i = 0; i < childCount; i++) {
+                    TSNode child = node.getChild(i);
+                    if ("class_body".equals(child.getType())) {
+                        findFieldDeclarationsWithContextOverride(child, sourceCode, fields, packageName,
+                                newClassContext, topLevelClassNameOverride);
+                    }
+                }
+                return;
+            }
+        } else if ("field_declaration".equals(nodeType)) {
+            extractFieldNamesWithContext(node, sourceCode, fields, packageName, classContext);
+            return;
+        }
+
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            findFieldDeclarationsWithContextOverride(child, sourceCode, fields, packageName,
+                    classContext, topLevelClassNameOverride);
+        }
+    }
+
     /**
      * Recursively find all field declarations in the AST.
      */
@@ -1092,8 +1222,10 @@ public class StateFieldCoverage implements Metric {
         TSTree tree = parser.parseString(null, oracle);
         TSNode rootNode = tree.getRootNode();
         
-        // Find all method invocations in the oracle, filtering by variable type
-        findMethodInvocationsWithTypeCheck(rootNode, oracle, variableTypes, targetClassInfo, testPackage, accessedFields, classPath);
+        // Find all method invocations in the oracle, filtering by variable type.
+        // Pass allFields so that accessed fields from inherited methods are normalized
+        // to use the concrete class name (rather than the abstract parent class name).
+        findMethodInvocationsWithTypeCheck(rootNode, oracle, variableTypes, targetClassInfo, testPackage, accessedFields, classPath, allFields);
         
         // Also check for direct field accesses in the oracle, filtering by variable type
         findDirectFieldAccessesWithTypeCheck(rootNode, oracle, accessedFields, allFields, variableTypes, targetClassInfo, testPackage);
@@ -2152,7 +2284,8 @@ public class StateFieldCoverage implements Metric {
                                                      TargetClassInfo targetClassInfo,
                                                      String testPackage,
                                                      Set<String> accessedFields,
-                                                     String classPath) {
+                                                     String classPath,
+                                                     Set<String> targetFields) {
         if (node == null) {
             return;
         }
@@ -2174,9 +2307,22 @@ public class StateFieldCoverage implements Metric {
                         int endByte = nameNode.getEndByte();
                         String methodName = sourceCode.substring(startByte, endByte);
                         
-                        // Get fields accessed by this method
+                        // Get fields accessed by this method; normalize FQNs so that fields
+                        // inherited from abstract parents are attributed to the concrete class.
+                        // Only normalize field FQNs that are not already present in the target
+                        // fields set, to avoid collapsing distinct fields that share a short name
+                        // (e.g. an outer class field and an inner class field both named "value").
                         Set<String> methodFields = getFieldsAccessedByMethod(classPath, methodName);
-                        accessedFields.addAll(methodFields);
+                        for (String fqn : methodFields) {
+                            if (targetFields.contains(fqn)) {
+                                // Already an exact match in target fields – use as-is
+                                accessedFields.add(fqn);
+                            } else {
+                                // Field may come from an abstract parent; try to remap by short name
+                                String normalized = mapFieldNameToFQN(extractShortFieldName(fqn), targetFields);
+                                accessedFields.add(normalized != null ? normalized : fqn);
+                            }
+                        }
                     }
                 }
             }
@@ -2188,7 +2334,7 @@ public class StateFieldCoverage implements Metric {
             TSNode child = node.getChild(i);
             if (child != null) {
                 findMethodInvocationsWithTypeCheck(child, sourceCode, variableTypes, targetClassInfo, 
-                                                  testPackage, accessedFields, classPath);
+                                                  testPackage, accessedFields, classPath, targetFields);
             }
         }
     }
