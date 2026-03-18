@@ -42,6 +42,9 @@ public class StateFieldCoverage implements Metric {
     // Static field inclusion
     private boolean includeStaticFields;
     
+    // Concrete parent class field inclusion
+    private boolean includeConcreteParentClassFields;
+
     // Dependency class tracking (external dependencies only, cleared at start of each assessment)
     private Set<String> lastLoadedDependencyClasses; // External classes successfully loaded from separate files
     private Set<String> lastFailedDependencyClasses; // External classes that failed to load (source file not found)
@@ -61,6 +64,7 @@ public class StateFieldCoverage implements Metric {
         this.iterableFieldsCache = new HashMap<>();
         this.methodIterationCache = new HashMap<>();
         this.includeStaticFields = false; // Disabled by default
+        this.includeConcreteParentClassFields = false; // Disabled by default
         this.lastLoadedDependencyClasses = new HashSet<>();
         this.lastFailedDependencyClasses = new HashSet<>();
     }
@@ -120,6 +124,12 @@ public class StateFieldCoverage implements Metric {
         String includeStaticFieldsValue = config.getProperty("include_static_fields");
         if (includeStaticFieldsValue != null && !includeStaticFieldsValue.isEmpty()) {
             this.includeStaticFields = Boolean.parseBoolean(includeStaticFieldsValue);
+        }
+        
+        // Configure concrete parent class field inclusion
+        String includeConcreteParentClassFieldsValue = config.getProperty("include_concrete_parent_class_fields");
+        if (includeConcreteParentClassFieldsValue != null && !includeConcreteParentClassFieldsValue.isEmpty()) {
+            this.includeConcreteParentClassFields = Boolean.parseBoolean(includeConcreteParentClassFieldsValue);
         }
         
         // Clear caches to ensure fresh computation with new configuration
@@ -512,6 +522,14 @@ public class StateFieldCoverage implements Metric {
                         Set<String> parentFields = getAllFieldsInClassRecursive(parentClassPath, visitedClasses, false,
                                 classNameForParent, packageNameForParent);
                         fields.addAll(parentFields);
+                        
+                        // If includeConcreteParentClassFields is enabled and the parent class is
+                        // concrete (not abstract), also include its fields using the parent's own name
+                        if (includeConcreteParentClassFields && !isClassAbstract(parentClassPath)) {
+                            Set<String> parentOwnFields = getAllFieldsInClassRecursive(parentClassPath,
+                                    new HashSet<>(), true, null, null);
+                            fields.addAll(parentOwnFields);
+                        }
                     }
                 }
                 
@@ -560,6 +578,51 @@ public class StateFieldCoverage implements Metric {
             }
         }
         return null;
+    }
+
+    /**
+     * Check whether the top-level class declared at {@code classPath} is abstract.
+     *
+     * @param classPath Path to the Java source file to inspect
+     * @return {@code true} if the class is declared with the {@code abstract} modifier,
+     *         {@code false} otherwise (including when the file cannot be read)
+     */
+    private boolean isClassAbstract(String classPath) {
+        Path path = Paths.get(classPath);
+        if (!Files.exists(path)) {
+            return false;
+        }
+        try {
+            String classSource = Files.readString(path);
+            TSTree tree = parser.parseString(null, classSource);
+            TSNode rootNode = tree.getRootNode();
+            int childCount = rootNode.getChildCount();
+            for (int i = 0; i < childCount; i++) {
+                TSNode child = rootNode.getChild(i);
+                if ("class_declaration".equals(child.getType())) {
+                    // Modifiers are unnamed children of class_declaration; iterate to find the
+                    // "modifiers" node and then check for the "abstract" keyword.
+                    int classChildCount = child.getChildCount();
+                    for (int j = 0; j < classChildCount; j++) {
+                        TSNode classChild = child.getChild(j);
+                        if ("modifiers".equals(classChild.getType())) {
+                            int modCount = classChild.getChildCount();
+                            for (int k = 0; k < modCount; k++) {
+                                TSNode modifier = classChild.getChild(k);
+                                if ("abstract".equals(modifier.getType())) {
+                                    return true;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    return false;
+                }
+            }
+        } catch (IOException e) {
+            // Cannot read file – treat as non-abstract
+        }
+        return false;
     }
     
     /**
