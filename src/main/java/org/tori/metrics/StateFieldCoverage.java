@@ -494,8 +494,11 @@ public class StateFieldCoverage implements Metric {
                 // Determine the concrete class name to propagate to parent classes
                 String classNameForParent = concreteClassName;
                 String packageNameForParent = concretePackageName;
-                if (isRootClass) {
-                    // Propagate this class's own name to any ancestor classes
+                if (isRootClass || concreteClassName == null) {
+                    // Propagate this class's own name to any ancestor classes.
+                    // This applies to root classes AND to dependency (field-type) classes so that
+                    // inherited fields of a dependency are attributed to the dependency class
+                    // itself, not to its parent.
                     classNameForParent = findTopLevelClassName(rootNode, classSource);
                     packageNameForParent = packageName;
                 }
@@ -512,8 +515,6 @@ public class StateFieldCoverage implements Metric {
                 }
                 
                 // Include fields from parent class (inheritance chain), propagating concrete class name
-                // (classNameForParent may be null for dependency classes, in which case the parent
-                // class fields use the parent's own name – matching the original behaviour)
                 String superclassName = findTopLevelSuperclassName(rootNode, classSource);
                 if (superclassName != null) {
                     Map<String, String> imports = extractImports(rootNode, classSource);
