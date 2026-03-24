@@ -9,6 +9,8 @@ public abstract class AbstractRenderer {
 
     private ShapeList shapeList;
 
+    private ObjectList objectList;
+
     public AbstractRenderer() {
         this.shapeList = new ShapeList();
     }
@@ -19,5 +21,13 @@ public abstract class AbstractRenderer {
 
     protected void setShapeList(ShapeList shapeList) {
         this.shapeList = shapeList;
+    }
+
+    public ObjectList getObjectList() {
+        return objectList;
+    }
+
+    protected void setObjectList(ObjectList objectList) {
+        this.objectList = objectList;
     }
 }

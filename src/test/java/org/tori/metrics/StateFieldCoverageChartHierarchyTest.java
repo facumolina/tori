@@ -81,18 +81,24 @@ class StateFieldCoverageChartHierarchyTest {
         StateFieldCoverage metric = buildMetric(false);
         Set<String> targetFields = discoverTargetFields(metric);
 
-        assertEquals(3, targetFields.size(),
-                "With iterable_field_tracking=false, there should be exactly 3 target fields: shapeList, objects, and size");
+        assertEquals(6, targetFields.size(),
+                "With iterable_field_tracking=false, there should be exactly 6 target fields: shapeList, objectList, shapeList.objects, shapeList.size, objectList.objects, and objectList.size");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("AbstractCategoryItemRenderer.shapeList")),
                 "shapeList must be attributed to AbstractCategoryItemRenderer");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("AbstractCategoryItemRenderer.objectList")),
+                "objectList must be attributed to AbstractCategoryItemRenderer");
         assertFalse(targetFields.stream().anyMatch(f -> f.contains("AbstractRenderer")),
                 "No field should be attributed to AbstractRenderer");
         assertFalse(targetFields.stream().anyMatch(f -> f.contains("AbstractObjectList")),
                 "No field should be attributed to AbstractObjectList");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ShapeList.objects")),
-                "objects field should be included even with iterable_field_tracking=false");
+                "ShapeList.objects field should be included even with iterable_field_tracking=false");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ShapeList.size")),
-                "size field should be included even with iterable_field_tracking=false");
+                "ShapeList.size field should be included even with iterable_field_tracking=false");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ObjectList.objects")),
+                "ObjectList.objects field should be included even with iterable_field_tracking=false");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ObjectList.size")),
+                "ObjectList.size field should be included even with iterable_field_tracking=false");
     }
 
 
@@ -105,11 +111,13 @@ class StateFieldCoverageChartHierarchyTest {
         StateFieldCoverage metric = buildMetric(true);
         Set<String> targetFields = discoverTargetFields(metric);
 
-        // shapeList + objects + size  →  4 target fields
-        assertEquals(4, targetFields.size(),
+        // shapeList + objects + size  →  8 target fields
+        assertEquals(8, targetFields.size(),
                 "With iterable_field_tracking=true, shapeList, objects, objects+, and size should all be tracked as target fields");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("AbstractCategoryItemRenderer.shapeList")),
                 "shapeList must be attributed to AbstractCategoryItemRenderer");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("AbstractCategoryItemRenderer.objectList")),
+                "objectList must be attributed to AbstractCategoryItemRenderer");
         assertFalse(targetFields.stream().anyMatch(f -> f.contains("AbstractRenderer")),
                 "No field should be attributed to AbstractRenderer");
         assertFalse(targetFields.stream().anyMatch(f -> f.contains("AbstractObjectList")),
@@ -119,6 +127,12 @@ class StateFieldCoverageChartHierarchyTest {
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ShapeList.size")),
                 "size field should be included with iterable_field_tracking=true");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ShapeList.objects+")),
+                "objects+ field should be included with iterable_field_tracking=true");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ObjectList.objects")),
+                "objects field should be included with iterable_field_tracking=true");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ObjectList.size")),
+                "size field should be included with iterable_field_tracking=true");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ObjectList.objects+")),
                 "objects+ field should be included with iterable_field_tracking=true");
     }
 
@@ -167,7 +181,7 @@ class StateFieldCoverageChartHierarchyTest {
 
     /**
      * An oracle that directly accesses the nested {@code size} field through the
-     * {@code ShapeList} dependency should yield 2/3.
+     * {@code ShapeList} dependency should yield 2/6.
      */
     @Test
     void testScore_shapeListAndSizeAccessed_noIterableTracking() {
@@ -180,13 +194,13 @@ class StateFieldCoverageChartHierarchyTest {
                 }
                 """;
         double score = metric.assess(testCase, "assertEquals(0, r.getShapeList().size);");
-        assertEquals(2.0 / 3.0, score, 0.001,
-                "Accessing shapeList and size should give score 2/3");
+        assertEquals(2.0 / 6.0, score, 0.001,
+                "Accessing shapeList and size should give score 2/6");
     }
 
     /**
      * An oracle that accesses all three target fields ({@code shapeList},
-     * {@code objects}, {@code size}) in one expression should yield 1.0.
+     * {@code objects}, {@code size}) in one expression should yield 3/6.
      */
     @Test
     void testScore_allFieldsAccessed_noIterableTracking() {
@@ -200,8 +214,8 @@ class StateFieldCoverageChartHierarchyTest {
                 """;
         double score = metric.assess(testCase,
                 "assertEquals(r.getShapeList().size, r.getShapeList().objects.length);");
-        assertEquals(1.0, score, 0.001,
-                "Accessing shapeList, size, and objects should give score 1.0");
+        assertEquals(3.0 / 6.0, score, 0.001,
+                "Accessing shapeList, size, and objects should give score 3/6 with 6 total fields");
     }
 
     // =========================================================================
