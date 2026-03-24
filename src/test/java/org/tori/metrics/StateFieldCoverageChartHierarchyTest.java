@@ -161,8 +161,7 @@ class StateFieldCoverageChartHierarchyTest {
 
     /**
      * An oracle that accesses only the inherited {@code shapeList} field via
-     * {@code getShapeList()} should yield 1/3 with 3 total target fields
-     * ({@code shapeList}, {@code objects}, {@code size}).
+     * {@code getShapeList()} should yield 1/6 with 6 total target fields.
      */
     @Test
     void testScore_onlyShapeListAccessed_noIterableTracking() {
@@ -175,8 +174,8 @@ class StateFieldCoverageChartHierarchyTest {
                 }
                 """;
         double score = metric.assess(testCase, "assertNotNull(r.getShapeList());");
-        assertEquals(1.0 / 3.0, score, 0.001,
-                "Accessing only shapeList should give score 1/3");
+        assertEquals(1.0 / 6.0, score, 0.001,
+                "Accessing only shapeList should give score 1/6");
     }
 
     /**
@@ -223,8 +222,8 @@ class StateFieldCoverageChartHierarchyTest {
     // =========================================================================
 
     /**
-     * With iterable tracking enabled (4 total fields), an oracle accessing only
-     * {@code shapeList} should yield score 1/4 = 0.25.
+     * With iterable tracking enabled (8 total fields), an oracle accessing only
+     * {@code shapeList} should yield score 1/8 = 0.125.
      */
     @Test
     void testScore_onlyShapeListAccessed_withIterableTracking() {
@@ -237,13 +236,13 @@ class StateFieldCoverageChartHierarchyTest {
                 }
                 """;
         double score = metric.assess(testCase, "assertNotNull(r.getShapeList());");
-        assertEquals(0.25, score, 0.001,
-                "With iterable tracking, accessing only shapeList should give score 1/4");
+        assertEquals(1.0 / 8.0, score, 0.001,
+                "With iterable tracking, accessing only shapeList should give score 1/8");
     }
 
     /**
      * With iterable tracking enabled, an oracle accessing {@code shapeList} and
-     * {@code size} should yield score 2/4 = 0.5.
+     * {@code size} should yield score 2/8 = 0.25.
      */
     @Test
     void testScore_shapeListAndSizeAccessed_withIterableTracking() {
@@ -256,8 +255,8 @@ class StateFieldCoverageChartHierarchyTest {
                 }
                 """;
         double score = metric.assess(testCase, "assertEquals(0, r.getShapeList().size);");
-        assertEquals(0.5, score, 0.001,
-                "With iterable tracking, accessing shapeList and size should give score 2/4");
+        assertEquals(2.0 / 8.0, score, 0.001,
+                "With iterable tracking, accessing shapeList and size should give score 2/8");
     }
 
 }
