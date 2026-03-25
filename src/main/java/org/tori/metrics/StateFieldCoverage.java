@@ -509,9 +509,13 @@ public class StateFieldCoverage implements Metric {
                 // Find referenced classes in the same directory
                 Set<String> referencedClassPaths = findReferencedClassPaths(classPath, classSource, fieldTypes, isRootClass);
                 
-                // Recursively include fields from referenced classes (not root anymore, no name override)
+                // Recursively include fields from referenced classes (not root anymore, no name override).
+                // Each sibling dependency gets its own copy of visitedClasses so that two dependencies
+                // sharing a common ancestor (e.g. ShapeList and ObjectList both extending AbstractObjectList)
+                // both discover their inherited fields independently, without the first one's traversal
+                // preventing the second from visiting the shared ancestor.
                 for (String referencedClassPath : referencedClassPaths) {
-                    Set<String> referencedFields = getAllFieldsInClassRecursive(referencedClassPath, visitedClasses, false);
+                    Set<String> referencedFields = getAllFieldsInClassRecursive(referencedClassPath, new HashSet<>(visitedClasses), false);
                     fields.addAll(referencedFields);
                 }
                 
