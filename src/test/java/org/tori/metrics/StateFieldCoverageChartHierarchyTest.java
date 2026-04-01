@@ -18,21 +18,34 @@ import static org.junit.jupiter.api.Assertions.*;
  *   ShapeList extends AbstractObjectList
  *       (no own fields)
  *          ↑ used as field type
+ *   ObjectList extends AbstractObjectList
+ *       (no own fields)
+ *          ↑ used as field type
+ *   CategoryPlot
+ *       orientation  (Object)
+ *       axisOffset   (int)
+ *       domainAxes   (ObjectList)
  *   AbstractRenderer  (abstract)
- *       shapeList  (private ShapeList)   ← private field in abstract parent
+ *       shapeList   (private ShapeList)   ← private field in abstract parent
+ *       objectList  (private ObjectList)  ← private field in abstract parent
  *          ↑
- *   AbstractCategoryItemRenderer extends AbstractRenderer  (abstract, no own fields)
+ *   AbstractCategoryItemRenderer extends AbstractRenderer
+ *       plot  (private CategoryPlot)      ← own field
  * </pre>
  *
  * Key aspects under test:
  * <ol>
  *   <li>A {@code private} field declared in an abstract parent class is discovered
  *       and attributed to the target class (not to its declaring class).</li>
- *   <li>With {@code iterable_field_tracking=false} only {@code shapeList} is
- *       counted (1 field total).</li>
- *   <li>With {@code iterable_field_tracking=true} the nested fields of
- *       {@code ShapeList} ({@code objects}, {@code size}) are also tracked,
- *       giving 3 target fields in total.</li>
+ *   <li>With {@code iterable_field_tracking=false}, the target fields are:
+ *       {@code shapeList}, {@code objectList}, {@code plot},
+ *       {@code ShapeList.objects}, {@code ShapeList.size},
+ *       {@code ObjectList.objects}, {@code ObjectList.size},
+ *       {@code CategoryPlot.orientation}, {@code CategoryPlot.axisOffset},
+ *       {@code CategoryPlot.domainAxes} — 10 fields total.</li>
+ *   <li>With {@code iterable_field_tracking=true} the iterable nested fields
+ *       ({@code ShapeList.objects+} and {@code ObjectList.objects+}) are also
+ *       tracked, giving 12 target fields in total.</li>
  *   <li>Assessment scores are calculated correctly against the discovered fields.</li>
  * </ol>
  *
@@ -81,12 +94,17 @@ class StateFieldCoverageChartHierarchyTest {
         StateFieldCoverage metric = buildMetric(false);
         Set<String> targetFields = discoverTargetFields(metric);
 
-        assertEquals(6, targetFields.size(),
-                "With iterable_field_tracking=false, there should be exactly 6 target fields: shapeList, objectList, shapeList.objects, shapeList.size, objectList.objects, and objectList.size");
+        assertEquals(10, targetFields.size(),
+                "With iterable_field_tracking=false, there should be exactly 10 target fields: " +
+                "shapeList, objectList, plot, ShapeList.objects, ShapeList.size, " +
+                "ObjectList.objects, ObjectList.size, CategoryPlot.orientation, " +
+                "CategoryPlot.axisOffset, and CategoryPlot.domainAxes");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("AbstractCategoryItemRenderer.shapeList")),
                 "shapeList must be attributed to AbstractCategoryItemRenderer");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("AbstractCategoryItemRenderer.objectList")),
                 "objectList must be attributed to AbstractCategoryItemRenderer");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("AbstractCategoryItemRenderer.plot")),
+                "plot must be attributed to AbstractCategoryItemRenderer");
         assertFalse(targetFields.stream().anyMatch(f -> f.contains("AbstractRenderer")),
                 "No field should be attributed to AbstractRenderer");
         assertFalse(targetFields.stream().anyMatch(f -> f.contains("AbstractObjectList")),
@@ -99,6 +117,12 @@ class StateFieldCoverageChartHierarchyTest {
                 "ObjectList.objects field should be included even with iterable_field_tracking=false");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ObjectList.size")),
                 "ObjectList.size field should be included even with iterable_field_tracking=false");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("CategoryPlot.orientation")),
+                "CategoryPlot.orientation field should be included");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("CategoryPlot.axisOffset")),
+                "CategoryPlot.axisOffset field should be included");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("CategoryPlot.domainAxes")),
+                "CategoryPlot.domainAxes field should be included");
     }
 
 
@@ -111,13 +135,19 @@ class StateFieldCoverageChartHierarchyTest {
         StateFieldCoverage metric = buildMetric(true);
         Set<String> targetFields = discoverTargetFields(metric);
 
-        // shapeList + objects + size  →  8 target fields
-        assertEquals(8, targetFields.size(),
-                "With iterable_field_tracking=true, shapeList, objects, objects+, and size should all be tracked as target fields");
+        // shapeList + objectList + plot + CategoryPlot fields + nested ShapeList/ObjectList fields → 12 target fields
+        assertEquals(12, targetFields.size(),
+                "With iterable_field_tracking=true, shapeList, objectList, plot, " +
+                "ShapeList.objects, ShapeList.size, ShapeList.objects+, " +
+                "ObjectList.objects, ObjectList.size, ObjectList.objects+, " +
+                "CategoryPlot.orientation, CategoryPlot.axisOffset, CategoryPlot.domainAxes " +
+                "should all be tracked as target fields");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("AbstractCategoryItemRenderer.shapeList")),
                 "shapeList must be attributed to AbstractCategoryItemRenderer");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("AbstractCategoryItemRenderer.objectList")),
                 "objectList must be attributed to AbstractCategoryItemRenderer");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("AbstractCategoryItemRenderer.plot")),
+                "plot must be attributed to AbstractCategoryItemRenderer");
         assertFalse(targetFields.stream().anyMatch(f -> f.contains("AbstractRenderer")),
                 "No field should be attributed to AbstractRenderer");
         assertFalse(targetFields.stream().anyMatch(f -> f.contains("AbstractObjectList")),
@@ -134,6 +164,12 @@ class StateFieldCoverageChartHierarchyTest {
                 "size field should be included with iterable_field_tracking=true");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("ObjectList.objects+")),
                 "objects+ field should be included with iterable_field_tracking=true");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("CategoryPlot.orientation")),
+                "CategoryPlot.orientation field should be included");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("CategoryPlot.axisOffset")),
+                "CategoryPlot.axisOffset field should be included");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("CategoryPlot.domainAxes")),
+                "CategoryPlot.domainAxes field should be included");
     }
 
     // =========================================================================
@@ -161,7 +197,7 @@ class StateFieldCoverageChartHierarchyTest {
 
     /**
      * An oracle that accesses only the inherited {@code shapeList} field via
-     * {@code getShapeList()} should yield 1/6 with 6 total target fields.
+     * {@code getShapeList()} should yield 1/10 with 10 total target fields.
      */
     @Test
     void testScore_onlyShapeListAccessed_noIterableTracking() {
@@ -174,13 +210,13 @@ class StateFieldCoverageChartHierarchyTest {
                 }
                 """;
         double score = metric.assess(testCase, "assertNotNull(r.getShapeList());");
-        assertEquals(1.0 / 6.0, score, 0.001,
-                "Accessing only shapeList should give score 1/6");
+        assertEquals(1.0 / 10.0, score, 0.001,
+                "Accessing only shapeList should give score 1/10");
     }
 
     /**
      * An oracle that directly accesses the nested {@code size} field through the
-     * {@code ShapeList} dependency should yield 2/6.
+     * {@code ShapeList} dependency should yield 2/10.
      */
     @Test
     void testScore_shapeListAndSizeAccessed_noIterableTracking() {
@@ -193,13 +229,13 @@ class StateFieldCoverageChartHierarchyTest {
                 }
                 """;
         double score = metric.assess(testCase, "assertEquals(0, r.getShapeList().size);");
-        assertEquals(2.0 / 6.0, score, 0.001,
-                "Accessing shapeList and size should give score 2/6");
+        assertEquals(2.0 / 10.0, score, 0.001,
+                "Accessing shapeList and size should give score 2/10");
     }
 
     /**
      * An oracle that accesses all three target fields ({@code shapeList},
-     * {@code objects}, {@code size}) in one expression should yield 3/6.
+     * {@code objects}, {@code size}) in one expression should yield 3/10.
      */
     @Test
     void testScore_allFieldsAccessed_noIterableTracking() {
@@ -213,8 +249,8 @@ class StateFieldCoverageChartHierarchyTest {
                 """;
         double score = metric.assess(testCase,
                 "assertEquals(r.getShapeList().size, r.getShapeList().objects.length);");
-        assertEquals(3.0 / 6.0, score, 0.001,
-                "Accessing shapeList, size, and objects should give score 3/6 with 6 total fields");
+        assertEquals(3.0 / 10.0, score, 0.001,
+                "Accessing shapeList, size, and objects should give score 3/10 with 10 total fields");
     }
 
     // =========================================================================
@@ -222,8 +258,8 @@ class StateFieldCoverageChartHierarchyTest {
     // =========================================================================
 
     /**
-     * With iterable tracking enabled (8 total fields), an oracle accessing only
-     * {@code shapeList} should yield score 1/8 = 0.125.
+     * With iterable tracking enabled (12 total fields), an oracle accessing only
+     * {@code shapeList} should yield score 1/12.
      */
     @Test
     void testScore_onlyShapeListAccessed_withIterableTracking() {
@@ -236,13 +272,13 @@ class StateFieldCoverageChartHierarchyTest {
                 }
                 """;
         double score = metric.assess(testCase, "assertNotNull(r.getShapeList());");
-        assertEquals(1.0 / 8.0, score, 0.001,
-                "With iterable tracking, accessing only shapeList should give score 1/8");
+        assertEquals(1.0 / 12.0, score, 0.001,
+                "With iterable tracking, accessing only shapeList should give score 1/12");
     }
 
     /**
      * With iterable tracking enabled, an oracle accessing {@code shapeList} and
-     * {@code size} should yield score 2/8 = 0.25.
+     * {@code size} should yield score 2/12.
      */
     @Test
     void testScore_shapeListAndSizeAccessed_withIterableTracking() {
@@ -255,8 +291,8 @@ class StateFieldCoverageChartHierarchyTest {
                 }
                 """;
         double score = metric.assess(testCase, "assertEquals(0, r.getShapeList().size);");
-        assertEquals(2.0 / 8.0, score, 0.001,
-                "With iterable tracking, accessing shapeList and size should give score 2/8");
+        assertEquals(2.0 / 12.0, score, 0.001,
+                "With iterable tracking, accessing shapeList and size should give score 2/12");
     }
 
 }
