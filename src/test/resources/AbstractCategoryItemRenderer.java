@@ -10,7 +10,8 @@
  */
 public abstract class AbstractCategoryItemRenderer extends AbstractRenderer {
 
-    // No own fields – all state comes from AbstractRenderer
+    /** The plot that the renderer is assigned to. */
+    private CategoryPlot plot;
 
     public AbstractCategoryItemRenderer() {
         super();
