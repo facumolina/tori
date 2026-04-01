@@ -277,6 +277,38 @@ class StateFieldCoverageChartHierarchyTest {
     }
 
     /**
+     * An oracle that creates a {@code CategoryPlot}, invokes its {@code clone} inside
+     * a try-catch, and then asserts equality via {@code assertTrue(p.equals(clone), "Cloned plot should be equal to original")}
+     * should cover the {@code plot} field, yielding score 1/10 with 10 total fields.
+     */
+    @Test
+    void testScore_plotCoveredViaGetPlot_withCloneAndEquals() {
+        StateFieldCoverage metric = buildMetric(false);
+        String testCase = """
+                @Test
+                public void test() {
+                    CategoryPlot p = new CategoryPlot();
+                    CategoryPlot clone = null;
+                    try {
+                        clone = (CategoryPlot) p.clone();
+                    } catch (CloneNotSupportedException e) {
+                        fail("CategoryPlot clone failed");
+                    }
+                    assertTrue(p.equals(clone), "Cloned plot should be equal to original");
+                }
+                """;
+        double score = metric.assess(testCase, "assertTrue(p.equals(clone), \"Cloned plot should be equal to original\");");
+        assertEquals(3.0 / 10.0, score, 0.001,
+                "Accessing only plot via equals should give score 3/10 with 10 total fields");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("CategoryPlot.orientation")),
+                "CategoryPlot.orientation field should be included");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("CategoryPlot.axisOffset")),
+                "CategoryPlot.axisOffset field should be included");
+        assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("CategoryPlot.domainAxes")),
+                "CategoryPlot.domainAxes field should be included");
+    }
+
+    /**
      * With iterable tracking enabled, an oracle accessing {@code shapeList} and
      * {@code size} should yield score 2/12.
      */
