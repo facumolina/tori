@@ -46,6 +46,12 @@ public class StateFieldCoverage implements Metric {
     // Concrete parent class field inclusion
     private boolean includeConcreteParentClassFields;
 
+    // Assert-only-target-class-methods flag:
+    // When false (default), all methods called in assert statements are inspected for covered fields,
+    // regardless of the type of the object the method is called on.
+    // When true, only methods called on objects of the target class type are inspected.
+    private boolean assertOnlyTargetClassMethods;
+
     // Dependency class tracking (external dependencies only, cleared at start of each assessment)
     private Set<String> lastLoadedDependencyClasses; // External classes successfully loaded from separate files
     private Set<String> lastFailedDependencyClasses; // External classes that failed to load (source file not found)
@@ -66,6 +72,7 @@ public class StateFieldCoverage implements Metric {
         this.methodIterationCache = new HashMap<>();
         this.includeStaticFields = false; // Disabled by default
         this.includeConcreteParentClassFields = false; // Disabled by default
+        this.assertOnlyTargetClassMethods = false; // Disabled by default: inspect all methods in asserts
         this.lastLoadedDependencyClasses = new HashSet<>();
         this.lastFailedDependencyClasses = new HashSet<>();
     }
@@ -131,6 +138,12 @@ public class StateFieldCoverage implements Metric {
         String includeConcreteParentClassFieldsValue = config.getProperty("include_concrete_parent_class_fields");
         if (includeConcreteParentClassFieldsValue != null && !includeConcreteParentClassFieldsValue.isEmpty()) {
             this.includeConcreteParentClassFields = Boolean.parseBoolean(includeConcreteParentClassFieldsValue);
+        }
+        
+        // Configure assert-only-target-class-methods flag
+        String assertOnlyTargetClassMethodsValue = config.getProperty("assert_only_target_class_methods");
+        if (assertOnlyTargetClassMethodsValue != null && !assertOnlyTargetClassMethodsValue.isEmpty()) {
+            this.assertOnlyTargetClassMethods = Boolean.parseBoolean(assertOnlyTargetClassMethodsValue);
         }
         
         // Clear caches to ensure fresh computation with new configuration
@@ -253,6 +266,18 @@ public class StateFieldCoverage implements Metric {
      */
     public boolean isIncludeStaticFieldsEnabled() {
         return includeStaticFields;
+    }
+
+    /**
+     * Check if only methods from the target class are inspected in assert statements.
+     * When false (default), all methods called in assert statements are inspected for covered fields,
+     * regardless of the type of the object the method is called on.
+     * When true, only methods called on objects of the target class type are inspected.
+     *
+     * @return true if only target class methods are inspected, false otherwise
+     */
+    public boolean isAssertOnlyTargetClassMethods() {
+        return assertOnlyTargetClassMethods;
     }
     
     /**
@@ -1146,7 +1171,27 @@ public class StateFieldCoverage implements Metric {
         // This fallback ensures we can still attempt resolution even in non-standard structures
         return currentDir;
     }
-    
+
+    /**
+     * Resolve the class path for a given type name by looking in the same directory as the
+     * reference class path. This is used when {@code assertOnlyTargetClassMethods} is false and
+     * a method is called on an object whose type is not the target class (e.g. CategoryPlot.equals
+     * when the target class is AbstractCategoryItemRenderer).
+     *
+     * @param typeName       Simple class name to resolve (e.g. "CategoryPlot")
+     * @param referenceClassPath Path to the reference class file (used to determine the search directory)
+     * @return Resolved file path if found in the same directory, or null otherwise
+     */
+    private String resolveClassPathInSameDirectory(String typeName, String referenceClassPath) {
+        Path refPath = Paths.get(referenceClassPath).normalize();
+        Path directory = refPath.getParent();
+        if (directory == null) {
+            return null;
+        }
+        Path candidate = directory.resolve(typeName + ".java");
+        return Files.exists(candidate) ? candidate.toString() : null;
+    }
+
     /**
      * Recursively find all field declarations with their class context.
      * Fields are stored as fully qualified names: package.class.field_name
@@ -2389,28 +2434,61 @@ public class StateFieldCoverage implements Metric {
                 String variableName = extractIdentifierFromExpression(objectNode, sourceCode);
                 // If we can identify the variable, check its type
                 // If we can't (like for method chains), allow it (conservative approach)
-                if (variableName == null || isTargetClassType(variableName, variableTypes, targetClassInfo, testPackage)) {
+                boolean isObjectOfTargetClassType = (variableName == null ||
+                        isTargetClassType(variableName, variableTypes, targetClassInfo, testPackage));
+
+                if (isObjectOfTargetClassType || !assertOnlyTargetClassMethods) {
                     // Get the method name
                     TSNode nameNode = node.getChildByFieldName("name");
                     if (nameNode != null && "identifier".equals(nameNode.getType())) {
                         int startByte = nameNode.getStartByte();
                         int endByte = nameNode.getEndByte();
                         String methodName = byteSubstring(sourceCode, startByte, endByte);
+
+                        // Determine the class path to use for method lookup.
+                        // When the object is of the target class type (or unidentifiable), use the
+                        // target class path as usual.
+                        // When the object is of a different type and assertOnlyTargetClassMethods is
+                        // false, resolve the class path from the variable's actual type so that the
+                        // method body of the correct class (e.g. CategoryPlot.equals) is analysed.
+                        // If the class cannot be resolved, skip the method lookup to avoid false positives.
+                        String methodClassPath = classPath;
+                        if (!isObjectOfTargetClassType && variableName != null) {
+                            String varType = variableTypes.get(variableName);
+                            if (varType != null) {
+                                String resolvedPath = resolveClassPathInSameDirectory(varType, classPath);
+                                if (resolvedPath != null) {
+                                    methodClassPath = resolvedPath;
+                                } else {
+                                    // Cannot resolve the class for this non-target variable; skip lookup
+                                    methodClassPath = null;
+                                }
+                            } else {
+                                // Variable type unknown for a non-target variable; skip lookup
+                                methodClassPath = null;
+                            }
+                        }
                         
                         // Get fields accessed by this method; normalize FQNs so that fields
                         // inherited from abstract parents are attributed to the concrete class.
                         // Only normalize field FQNs that are not already present in the target
                         // fields set, to avoid collapsing distinct fields that share a short name
                         // (e.g. an outer class field and an inner class field both named "value").
-                        Set<String> methodFields = getFieldsAccessedByMethod(classPath, methodName);
-                        for (String fqn : methodFields) {
-                            if (targetFields.contains(fqn)) {
-                                // Already an exact match in target fields – use as-is
-                                accessedFields.add(fqn);
-                            } else {
-                                // Field may come from an abstract parent; try to remap by short name
-                                String normalized = mapFieldNameToFQN(extractShortFieldName(fqn), targetFields);
-                                accessedFields.add(normalized != null ? normalized : fqn);
+                        // Fields that cannot be mapped to a known target field are intentionally
+                        // skipped (no raw-FQN fallback) to prevent score inflation.
+                        if (methodClassPath != null) {
+                            Set<String> methodFields = getFieldsAccessedByMethod(methodClassPath, methodName);
+                            for (String fqn : methodFields) {
+                                if (targetFields.contains(fqn)) {
+                                    // Already an exact match in target fields – use as-is
+                                    accessedFields.add(fqn);
+                                } else {
+                                    // Field may come from an abstract parent; try to remap by short name
+                                    String normalized = mapFieldNameToFQN(extractShortFieldName(fqn), targetFields);
+                                    if (normalized != null) {
+                                        accessedFields.add(normalized);
+                                    }
+                                }
                             }
                         }
                     }

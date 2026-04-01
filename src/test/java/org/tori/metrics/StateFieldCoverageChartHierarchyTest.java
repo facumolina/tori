@@ -300,6 +300,7 @@ class StateFieldCoverageChartHierarchyTest {
         double score = metric.assess(testCase, "assertTrue(p.equals(clone), \"Cloned plot should be equal to original\");");
         assertEquals(3.0 / 10.0, score, 0.001,
                 "Accessing only plot via equals should give score 3/10 with 10 total fields");
+        Set<String> targetFields = metric.getLastTargetFields();
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("CategoryPlot.orientation")),
                 "CategoryPlot.orientation field should be included");
         assertTrue(targetFields.stream().anyMatch(f -> f.endsWith("CategoryPlot.axisOffset")),
