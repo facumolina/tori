@@ -4,6 +4,8 @@
  * Used in tests that verify inherited fields (including transient ones) are
  * attributed to the concrete / target class.
  */
+package org.jfree.chart.util;
+
 public class AbstractObjectList {
 
     private transient Object[] objects;

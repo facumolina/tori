@@ -4,6 +4,8 @@
  * (objects : transient Object[], size : int).
  * Mimics the JFreeChart ObjectList class.
  */
+package org.jfree.chart.util;
+
 public class ObjectList extends AbstractObjectList {
 
     public ObjectList() {

@@ -4,6 +4,8 @@
  * (objects : transient Object[], size : int).
  * Mimics the JFreeChart ShapeList class.
  */
+package org.jfree.chart.util;
+
 public class ShapeList extends AbstractObjectList {
 
     public ShapeList() {

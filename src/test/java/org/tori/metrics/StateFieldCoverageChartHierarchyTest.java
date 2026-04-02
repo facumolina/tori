@@ -64,7 +64,7 @@ class StateFieldCoverageChartHierarchyTest {
         metric.setDetailedReportingEnabled(false);
         Properties config = new Properties();
         config.setProperty("target_class",
-                "src/test/resources/AbstractCategoryItemRenderer.java");
+                "src/test/resources/org/jfree/chart/renderer/category/AbstractCategoryItemRenderer.java");
         config.setProperty("iterable_field_tracking",
                 Boolean.toString(iterableTracking));
         metric.configure(config);
@@ -282,7 +282,7 @@ class StateFieldCoverageChartHierarchyTest {
      * should cover the {@code plot} field, yielding score 1/10 with 10 total fields.
      */
     @Test
-    void testScore_plotCoveredViaGetPlot_withCloneAndEquals() {
+    void testScore_plotFieldsCovered_viaCloneAndEquals() {
         StateFieldCoverage metric = buildMetric(false);
         String testCase = """
                 @Test

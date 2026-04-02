@@ -8,6 +8,11 @@
  *  - those fields are attributed to the target class (AbstractCategoryItemRenderer.shapeList)
  *  - nested field tracking follows the ShapeList -> AbstractObjectList hierarchy
  */
+package org.jfree.chart.renderer.category;
+
+import org.jfree.chart.renderer.AbstractRenderer;
+import org.jfree.chart.plot.CategoryPlot;
+
 public abstract class AbstractCategoryItemRenderer extends AbstractRenderer {
 
     /** The plot that the renderer is assigned to. */

@@ -1,3 +1,7 @@
+package org.jfree.chart.plot;
+
+import org.jfree.chart.util.ObjectList;
+
 public class CategoryPlot {
 
     private Object orientation;
@@ -24,7 +28,7 @@ public class CategoryPlot {
         if (this.orientation != that.orientation) {
             return false;
         }
-        if (!ObjectUtilities.equal(this.axisOffset, that.axisOffset)) {
+        if (!(this.axisOffset == that.axisOffset)) {
             return false;
         }
         if (!this.domainAxes.equals(that.domainAxes)) {
