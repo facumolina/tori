@@ -2242,11 +2242,13 @@ public class StateFieldCoverage implements Metric {
         String className;
         String packageName;
         String fullyQualifiedName;
-        
-        TargetClassInfo(String className, String packageName) {
+        Map<String, String> imports;
+
+        TargetClassInfo(String className, String packageName, Map<String, String> imports) {
             this.className = className;
             this.packageName = packageName;
             this.fullyQualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
+            this.imports = imports;
         }
     }
     
@@ -2272,8 +2274,11 @@ public class StateFieldCoverage implements Metric {
             if (className == null) {
                 return null;
             }
-            
-            return new TargetClassInfo(className, packageName);
+
+            // Extract imports
+            Map<String, String> imports = extractImports(rootNode, classSource);
+
+            return new TargetClassInfo(className, packageName, imports);
         } catch (IOException e) {
             return null;
         }
@@ -2456,7 +2461,8 @@ public class StateFieldCoverage implements Metric {
                         if (!isObjectOfTargetClassType && variableName != null) {
                             String varType = variableTypes.get(variableName);
                             if (varType != null) {
-                                String resolvedPath = resolveClassPathInSameDirectory(varType, classPath);
+                                String resolvedPath = resolveClassPath(varType, targetClassInfo.packageName,
+                                        targetClassInfo.imports, Paths.get(classPath));
                                 if (resolvedPath != null) {
                                     methodClassPath = resolvedPath;
                                 } else {
