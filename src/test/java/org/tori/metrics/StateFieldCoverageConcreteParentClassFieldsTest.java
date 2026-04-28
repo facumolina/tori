@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class StateFieldCoverageConcreteParentClassFieldsTest {
 
     private StateFieldCoverage buildMetric(boolean includeConcreteParentFields) {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         metric.setDetailedReportingEnabled(false);
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/ConcreteChild.java");
@@ -98,7 +98,7 @@ class StateFieldCoverageConcreteParentClassFieldsTest {
 
     @Test
     void testPropertyFalse_sameAsDefault() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         metric.setDetailedReportingEnabled(false);
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/ConcreteChild.java");
@@ -150,7 +150,7 @@ class StateFieldCoverageConcreteParentClassFieldsTest {
         // AbstractShape (abstract) -> Circle (concrete)
         // Even with include_concrete_parent_class_fields=true, abstract parents should NOT
         // contribute their own-named fields (the option only applies to concrete parents).
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         metric.setDetailedReportingEnabled(false);
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/Circle.java");
@@ -174,7 +174,7 @@ class StateFieldCoverageConcreteParentClassFieldsTest {
     // -------------------------------------------------------------------------
 
     private StateFieldCoverage buildMetricForDependency(boolean includeConcreteParentFields) {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         metric.setDetailedReportingEnabled(false);
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/ClassHoldingDependency.java");

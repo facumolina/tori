@@ -19,7 +19,7 @@ class StateFieldCoverageExecutionLevelTest {
 
     @BeforeEach
     void setUp() {
-        metric = new StateFieldCoverage();
+        metric = new StateFieldCoverageJava();
         metric.setDetailedReportingEnabled(false);
         
         Properties config = new Properties();
