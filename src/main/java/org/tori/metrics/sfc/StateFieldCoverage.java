@@ -1,4 +1,7 @@
-package org.tori.metrics;
+package org.tori.metrics.sfc;
+
+import org.tori.metrics.ExecutionLevel;
+import org.tori.metrics.Metric;
 
 import java.util.ArrayList;
 import java.util.HashSet;

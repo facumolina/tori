@@ -132,8 +132,8 @@ public class Main {
                         
                         // Print Metric Configuration section
                         System.out.println("Metric Configuration:");
-                        if (metric instanceof org.tori.metrics.StateFieldCoverage) {
-                            org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
+                        if (metric instanceof org.tori.metrics.sfc.StateFieldCoverage) {
+                            org.tori.metrics.sfc.StateFieldCoverage sfcMetric = (org.tori.metrics.sfc.StateFieldCoverage) metric;
                             java.util.List<String> paths = sfcMetric.getTargetClassPaths();
                             if (paths.size() == 1) {
                                 System.out.println("  target_class: " + paths.get(0));
@@ -234,8 +234,8 @@ public class Main {
                         double score = metric.assessMultiple(allTestCases.toString(), allOracles);
                         System.out.println("Test Class Assessment:");
                         
-                        if (metric instanceof org.tori.metrics.StateFieldCoverage) {
-                            org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
+                        if (metric instanceof org.tori.metrics.sfc.StateFieldCoverage) {
+                            org.tori.metrics.sfc.StateFieldCoverage sfcMetric = (org.tori.metrics.sfc.StateFieldCoverage) metric;
                             java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
                             java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
                             System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
@@ -258,8 +258,8 @@ public class Main {
                         } else {
                             double score = metric.assessMultiple(methodOracles.testCaseSource(), methodOracles.oracles());
                             
-                            if (metric instanceof org.tori.metrics.StateFieldCoverage) {
-                                org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
+                            if (metric instanceof org.tori.metrics.sfc.StateFieldCoverage) {
+                                org.tori.metrics.sfc.StateFieldCoverage sfcMetric = (org.tori.metrics.sfc.StateFieldCoverage) metric;
                                 java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
                                 java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
                                 System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
@@ -286,8 +286,8 @@ public class Main {
                                     double score = metric.assess(methodOracles.testCaseSource(), oracle);
                                     
                                     // If the metric is StateFieldCoverage, print detailed field information
-                                    if (metric instanceof org.tori.metrics.StateFieldCoverage) {
-                                        org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
+                                    if (metric instanceof org.tori.metrics.sfc.StateFieldCoverage) {
+                                        org.tori.metrics.sfc.StateFieldCoverage sfcMetric = (org.tori.metrics.sfc.StateFieldCoverage) metric;
                                         java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
                                         java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
                                         System.out.println("  - " + oracle);
