@@ -3,6 +3,7 @@ package org.tori;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.tori.metrics.StateFieldCoverage;
+import org.tori.metrics.StateFieldCoverageJava;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,7 +27,7 @@ class TestOracleInspectorTest_StateFieldCoverageTest {
     @BeforeEach
     void setUp() throws IOException {
         inspector = new TestOracleInspector();
-        metric = new StateFieldCoverage();
+        metric = new StateFieldCoverageJava();
         
         // Disable detailed reporting for tests
         metric.setDetailedReportingEnabled(false);
@@ -138,7 +139,7 @@ class TestOracleInspectorTest_StateFieldCoverageTest {
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/IntsList.java");
         
-        StateFieldCoverage testMetric = new StateFieldCoverage();
+        StateFieldCoverage testMetric = new StateFieldCoverageJava();
         testMetric.setDetailedReportingEnabled(false);
         assertDoesNotThrow(() -> testMetric.configure(config), 
             "Should be able to configure metric with valid target_class");
@@ -149,7 +150,7 @@ class TestOracleInspectorTest_StateFieldCoverageTest {
         // Test that configuration fails without target_class
         Properties config = new Properties();
         
-        StateFieldCoverage testMetric = new StateFieldCoverage();
+        StateFieldCoverage testMetric = new StateFieldCoverageJava();
         testMetric.setDetailedReportingEnabled(false);
         assertThrows(IllegalArgumentException.class, () -> testMetric.configure(config), 
             "Should throw exception when target_class is missing");
@@ -161,7 +162,7 @@ class TestOracleInspectorTest_StateFieldCoverageTest {
         Properties config = new Properties();
         config.setProperty("target_class", "");
         
-        StateFieldCoverage testMetric = new StateFieldCoverage();
+        StateFieldCoverage testMetric = new StateFieldCoverageJava();
         testMetric.setDetailedReportingEnabled(false);
         assertThrows(IllegalArgumentException.class, () -> testMetric.configure(config), 
             "Should throw exception when target_class is empty");

@@ -15,7 +15,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testConfigure_InvalidFilePath_ThrowsException() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/NonExistentFile.java");
         
@@ -34,7 +34,7 @@ class StateFieldCoverageTargetValidationTest {
     @Test
     void testConfigure_NonJavaFile_ThrowsException() {
         // Test with an existing non-Java file (README.md)
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "README.md");
         
@@ -52,7 +52,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testConfigure_ValidFilePath_Succeeds() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/IntsList.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -67,7 +67,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testConfigure_MultipleClasses_OneInvalid_ThrowsException() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/IntsList.java,src/test/resources/Invalid.java");
         
@@ -83,7 +83,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testFieldIdentification_IntsList() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/IntsList.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -109,7 +109,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testFieldIdentification_Person() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/Person.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -139,7 +139,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testFieldIdentification_MultipleClasses() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/IntsList.java,src/test/resources/Person.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -161,7 +161,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testFieldIdentification_WithIterableTracking() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/IntsList.java");
         config.setProperty("iterable_field_tracking", "true");
@@ -181,7 +181,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testFieldIdentification_usedClassesInOtherFiles_noIterables() { 
-        StateFieldCoverage metric = new StateFieldCoverage(); 
+        StateFieldCoverage metric = new StateFieldCoverageJava(); 
         Properties config = new Properties(); config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
         config.setProperty("iterable_field_tracking", "false");
         metric.configure(config);
@@ -201,7 +201,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testFieldIdentification_RedBlackTree_AllFields() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -243,7 +243,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testAssess_RedBlackTree_SizeField() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -276,7 +276,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testAssess_RedBlackTree_VerifyMissingFields() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -317,7 +317,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testFieldIdentification_RedBlackTree_WithIterableTracking() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
         config.setProperty("iterable_field_tracking", "true");
@@ -339,7 +339,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testDependencyTracking_RedBlackTree_LoadedDependency() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/RedBlackTree.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -360,7 +360,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testDependencyTracking_IntsList_NoExternalDependencies() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/IntsList.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -379,7 +379,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testDependencyTracking_MissingDependency() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/TestClassWithMissingDep.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -400,7 +400,7 @@ class StateFieldCoverageTargetValidationTest {
 
     @Test
     void testDependencyTracking_ClearedBetweenAssessments() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         
         // First assessment with RedBlackTree
         Properties config1 = new Properties();

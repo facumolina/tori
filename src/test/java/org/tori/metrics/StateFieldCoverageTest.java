@@ -23,7 +23,7 @@ class StateFieldCoverageTest {
 
     @BeforeEach
     void setUp() {
-        metric = new StateFieldCoverage();
+        metric = new StateFieldCoverageJava();
         
         // Disable detailed reporting for tests
         metric.setDetailedReportingEnabled(false);
@@ -187,7 +187,7 @@ class StateFieldCoverageTest {
     @Test
     void testAssess_IterableFieldTracking_CheckSize() {
         // Test with iterable field tracking enabled
-        StateFieldCoverage iterableMetric = new StateFieldCoverage();
+        StateFieldCoverage iterableMetric = new StateFieldCoverageJava();
         iterableMetric.setDetailedReportingEnabled(false);
         
         Properties config = new Properties();
@@ -236,7 +236,7 @@ class StateFieldCoverageTest {
     @Test
     void testAssess_IterableFieldTracking_Disabled() {
         // Verify that with iterable tracking disabled, we get the old behavior
-        StateFieldCoverage noIterableMetric = new StateFieldCoverage();
+        StateFieldCoverage noIterableMetric = new StateFieldCoverageJava();
         noIterableMetric.setDetailedReportingEnabled(false);
         
         Properties config = new Properties();

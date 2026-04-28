@@ -15,7 +15,7 @@ class StateFieldCoverageTransitiveDependencyTest {
 
     @Test
     void testTransitiveDependencyTracking_ThreeLevels() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/ClassA.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -39,7 +39,7 @@ class StateFieldCoverageTransitiveDependencyTest {
 
     @Test
     void testTransitiveDependencyTracking_AllFieldsIncluded() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/ClassA.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -72,7 +72,7 @@ class StateFieldCoverageTransitiveDependencyTest {
 
     @Test
     void testTransitiveDependencyTracking_MissingTransitiveDependency() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/ClassWithTransitiveMissingDep.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -92,7 +92,7 @@ class StateFieldCoverageTransitiveDependencyTest {
 
     @Test
     void testTransitiveDependencyTracking_FieldsFromLoadedTransitiveDeps() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/ClassWithTransitiveMissingDep.java");
         config.setProperty("iterable_field_tracking", "false");

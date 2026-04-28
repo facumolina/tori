@@ -15,7 +15,7 @@ class StateFieldCoveragePackageResolutionTest {
 
     @Test
     void testPackageAwareClassResolution() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/com/example/package1/MainClass.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -45,7 +45,7 @@ class StateFieldCoveragePackageResolutionTest {
 
     @Test
     void testPackageAwareClassResolution_DependencyTracking() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/com/example/package1/MainClass.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -66,7 +66,7 @@ class StateFieldCoveragePackageResolutionTest {
     
     @Test
     void testSamePackageResolution() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/com/example/package1/MixedReferenceClass.java");
         config.setProperty("iterable_field_tracking", "false");
@@ -99,7 +99,7 @@ class StateFieldCoveragePackageResolutionTest {
     
     @Test
     void testSamePackageResolution_DependencyTracking() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", "src/test/resources/com/example/package1/MixedReferenceClass.java");
         config.setProperty("iterable_field_tracking", "false");

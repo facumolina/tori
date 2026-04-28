@@ -33,7 +33,7 @@ class StateFieldCoverageMultipleClassesTest {
 
     @BeforeEach
     void setUp() {
-        metric = new StateFieldCoverage();
+        metric = new StateFieldCoverageJava();
         
         // Disable detailed reporting for tests
         metric.setDetailedReportingEnabled(false);
@@ -206,7 +206,7 @@ class StateFieldCoverageMultipleClassesTest {
     @Test
     void testSingleClassStillWorks() {
         // Test that single class configuration still works
-        StateFieldCoverage singleMetric = new StateFieldCoverage();
+        StateFieldCoverage singleMetric = new StateFieldCoverageJava();
         singleMetric.setDetailedReportingEnabled(false);
         
         Properties config = new Properties();

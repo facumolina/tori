@@ -25,7 +25,7 @@ class StateFieldCoverageFieldNameTest {
 
     @BeforeEach
     void setUp() {
-        metric = new StateFieldCoverage();
+        metric = new StateFieldCoverageJava();
         
         // Disable detailed reporting for tests
         metric.setDetailedReportingEnabled(false);

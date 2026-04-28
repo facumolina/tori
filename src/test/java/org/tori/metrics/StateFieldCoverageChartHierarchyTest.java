@@ -60,7 +60,7 @@ class StateFieldCoverageChartHierarchyTest {
     // -------------------------------------------------------------------------
 
     private StateFieldCoverage buildMetric(boolean iterableTracking) {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         metric.setDetailedReportingEnabled(false);
         Properties config = new Properties();
         config.setProperty("target_class",
