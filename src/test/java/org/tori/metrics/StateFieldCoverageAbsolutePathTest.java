@@ -23,7 +23,7 @@ class StateFieldCoverageAbsolutePathTest {
 
     @Test
     void testPackageAwareClassResolution_AbsolutePath() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         
         // Use absolute path instead of relative
@@ -56,7 +56,7 @@ class StateFieldCoverageAbsolutePathTest {
 
     @Test
     void testPackageAwareClassResolution_AbsolutePath_DependencyTracking() {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         
         // Use absolute path instead of relative
@@ -113,7 +113,7 @@ class StateFieldCoverageAbsolutePathTest {
             "}\n";
         Files.writeString(pkg2Dir.resolve("ReferencedClass.java"), referencedClassSource);
 
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         Properties config = new Properties();
         config.setProperty("target_class", pkg1Dir.resolve("MainClass.java").toString());
         config.setProperty("iterable_field_tracking", "false");

@@ -19,7 +19,7 @@ class StateFieldCoverageStaticFieldsTest {
     private static final String TARGET_CLASS_ITERABLE = "src/test/resources/ClassWithStaticIterableField.java";
 
     private StateFieldCoverage createMetric(boolean includeStaticFields) {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         metric.setDetailedReportingEnabled(false);
         Properties config = new Properties();
         config.setProperty("target_class", TARGET_CLASS);
@@ -30,7 +30,7 @@ class StateFieldCoverageStaticFieldsTest {
     }
 
     private StateFieldCoverage createIterableMetric(boolean includeStaticFields) {
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         metric.setDetailedReportingEnabled(false);
         Properties config = new Properties();
         config.setProperty("target_class", TARGET_CLASS_ITERABLE);
@@ -43,7 +43,7 @@ class StateFieldCoverageStaticFieldsTest {
     @Test
     void testDefaultBehavior_staticFieldsNotIncluded() {
         // Default configuration: include_static_fields=false
-        StateFieldCoverage metric = new StateFieldCoverage();
+        StateFieldCoverage metric = new StateFieldCoverageJava();
         metric.setDetailedReportingEnabled(false);
         Properties config = new Properties();
         config.setProperty("target_class", TARGET_CLASS);
