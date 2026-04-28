@@ -1,4 +1,4 @@
-package org.tori.metrics;
+package org.tori.metrics.sfc;
 
 import org.junit.jupiter.api.Test;
 
