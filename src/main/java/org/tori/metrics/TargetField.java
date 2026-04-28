@@ -78,6 +78,7 @@ public final class TargetField {
 
     @Override
     public int hashCode() {
+        // 31 is a conventional prime used in hash code computation (good distribution, JIT-friendly)
         return 31 * qualifiedName.hashCode() + (iterableVariant ? 1 : 0);
     }
 
