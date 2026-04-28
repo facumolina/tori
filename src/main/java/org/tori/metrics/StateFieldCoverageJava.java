@@ -3,7 +3,6 @@ package org.tori.metrics;
 import org.treesitter.*;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -28,7 +27,7 @@ import java.util.Set;
  * <p>It also implements the {@link Metric} interface so it can be used directly in the
  * tori framework. The core coverage computation is inherited from {@link StateFieldCoverage}.
  */
-public class StateFieldCoverageJava extends StateFieldCoverage implements Metric {
+public class StateFieldCoverageJava extends StateFieldCoverage {
 
     private final TSParser parser;
     private final TSLanguage javaLanguage;
@@ -96,26 +95,6 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         this.methodFieldAccessCache.clear();
         this.iterableFieldsCache.clear();
         this.methodIterationCache.clear();
-    }
-
-    // -------------------------------------------------------------------------
-    // Conversion helpers between internal String representation and TargetField IR
-    // -------------------------------------------------------------------------
-
-    /**
-     * Converts a set of internal FQN strings (possibly with "+" suffix for iterable
-     * variants) to a set of {@link TargetField} objects.
-     */
-    private Set<TargetField> toTargetFields(Set<String> fqns) {
-        Set<TargetField> result = new HashSet<>();
-        for (String fqn : fqns) {
-            if (fqn.endsWith("+")) {
-                result.add(new TargetField(fqn.substring(0, fqn.length() - 1), true));
-            } else {
-                result.add(new TargetField(fqn, false));
-            }
-        }
-        return result;
     }
 
     // -------------------------------------------------------------------------
@@ -258,7 +237,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
                         for (int j = 0; j < superChildCount; j++) {
                             TSNode superChild = superclassNode.getChild(j);
                             if ("type_identifier".equals(superChild.getType())) {
-                                return byteSubstring(sourceCode, superChild.getStartByte(),
+                                return StateFieldCoverageUtils.byteSubstring(sourceCode, superChild.getStartByte(),
                                         superChild.getEndByte());
                             }
                         }
@@ -315,7 +294,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
             if ("class_declaration".equals(child.getType())) {
                 TSNode nameNode = child.getChildByFieldName("name");
                 if (nameNode != null && "identifier".equals(nameNode.getType())) {
-                    return byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
+                    return StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
                 }
                 return null;
             }
@@ -399,7 +378,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
             if (insideClass) {
                 TSNode nameNode = node.getChildByFieldName("name");
                 if (nameNode != null && "identifier".equals(nameNode.getType())) {
-                    String className = byteSubstring(sourceCode, nameNode.getStartByte(),
+                    String className = StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(),
                             nameNode.getEndByte());
                     innerClassNames.add(className);
                 }
@@ -445,7 +424,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
             if (nameNode != null && "identifier".equals(nameNode.getType())) {
                 String className = (classContext.isEmpty() && topLevelClassNameOverride != null)
                         ? topLevelClassNameOverride
-                        : byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
+                        : StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
 
                 String newClassContext = classContext.isEmpty() ? className : classContext + "." + className;
 
@@ -479,7 +458,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         if ("class_declaration".equals(nodeType)) {
             TSNode nameNode = node.getChildByFieldName("name");
             if (nameNode != null && "identifier".equals(nameNode.getType())) {
-                String className = byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
+                String className = StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
                 String newClassContext = classContext.isEmpty() ? className : classContext + "." + className;
 
                 int childCount = node.getChildCount();
@@ -515,7 +494,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
             if ("variable_declarator".equals(child.getType())) {
                 TSNode identifier = child.getChild(0);
                 if (identifier != null && "identifier".equals(identifier.getType())) {
-                    String fieldName = byteSubstring(sourceCode, identifier.getStartByte(),
+                    String fieldName = StateFieldCoverageUtils.byteSubstring(sourceCode, identifier.getStartByte(),
                             identifier.getEndByte());
                     String fqn = packageName.isEmpty() ? classContext + "." + fieldName
                             : packageName + "." + classContext + "." + fieldName;
@@ -536,7 +515,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
                     int startByte = modChild.getStartByte();
                     int endByte = modChild.getEndByte();
                     if (endByte > startByte
-                            && "static".equals(byteSubstring(sourceCode, startByte, endByte))) {
+                            && "static".equals(StateFieldCoverageUtils.byteSubstring(sourceCode, startByte, endByte))) {
                         return true;
                     }
                 }
@@ -628,14 +607,14 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         for (MethodContext methodContext : methods) {
             Set<String> relevantFields = new HashSet<>();
             for (String fqn : allFields) {
-                if (isFieldInClassOrInnerClass(fqn, methodContext.classContext)) {
+                if (StateFieldCoverageUtils.isFieldInClassOrInnerClass(fqn, methodContext.classContext)) {
                     relevantFields.add(fqn);
                 }
             }
 
             Map<String, Set<String>> shortNameToFQN = new HashMap<>();
             for (String fqn : relevantFields) {
-                String shortName = extractShortFieldName(fqn);
+                String shortName = StateFieldCoverageUtils.extractShortFieldName(fqn);
                 shortNameToFQN.computeIfAbsent(shortName, k -> new HashSet<>()).add(fqn);
             }
 
@@ -668,7 +647,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         if ("class_declaration".equals(nodeType)) {
             TSNode nameNode = node.getChildByFieldName("name");
             if (nameNode != null && "identifier".equals(nameNode.getType())) {
-                String className = byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
+                String className = StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
                 String newClassContext = classContext.isEmpty()
                         ? (packageName.isEmpty() ? className : packageName + "." + className)
                         : classContext + "." + className;
@@ -685,7 +664,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
             if (!classContext.isEmpty()) {
                 TSNode nameNode = node.getChildByFieldName("name");
                 if (nameNode != null && "identifier".equals(nameNode.getType())) {
-                    String name = byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
+                    String name = StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
                     if (methodName.equals(name)) {
                         methods.add(new MethodContext(node, classContext));
                     }
@@ -702,22 +681,6 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         }
 
         return methods;
-    }
-
-    private String extractShortFieldName(String fqn) {
-        int lastDot = fqn.lastIndexOf('.');
-        if (lastDot >= 0 && lastDot < fqn.length() - 1) {
-            return fqn.substring(lastDot + 1);
-        }
-        return fqn;
-    }
-
-    private boolean isFieldInClassOrInnerClass(String fieldFQN, String classContext) {
-        if (classContext.isEmpty()) {
-            return false;
-        }
-        String prefix = classContext + ".";
-        return fieldFQN.startsWith(prefix) && fieldFQN.length() > prefix.length();
     }
 
     private void findLocalVariables(TSNode methodNode, String sourceCode, Set<String> localVars) {
@@ -754,7 +717,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
             if ("variable_declarator".equals(child.getType())) {
                 TSNode identifier = child.getChild(0);
                 if (identifier != null && "identifier".equals(identifier.getType())) {
-                    String varName = byteSubstring(sourceCode, identifier.getStartByte(),
+                    String varName = StateFieldCoverageUtils.byteSubstring(sourceCode, identifier.getStartByte(),
                             identifier.getEndByte());
                     variables.add(varName);
                 }
@@ -769,7 +732,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         if ("field_access".equals(nodeType)) {
             TSNode fieldNode = node.getChildByFieldName("field");
             if (fieldNode != null && "identifier".equals(fieldNode.getType())) {
-                String fieldName = byteSubstring(sourceCode, fieldNode.getStartByte(), fieldNode.getEndByte());
+                String fieldName = StateFieldCoverageUtils.byteSubstring(sourceCode, fieldNode.getStartByte(), fieldNode.getEndByte());
                 if (shortNameToFQN.containsKey(fieldName)) {
                     accessedFields.addAll(shortNameToFQN.get(fieldName));
                 }
@@ -777,7 +740,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         } else if ("identifier".equals(nodeType)) {
             TSNode parent = node.getParent();
             if (parent != null && !isMethodName(node, parent)) {
-                String name = byteSubstring(sourceCode, node.getStartByte(), node.getEndByte());
+                String name = StateFieldCoverageUtils.byteSubstring(sourceCode, node.getStartByte(), node.getEndByte());
                 if (shortNameToFQN.containsKey(name) && !localVars.contains(name)) {
                     accessedFields.addAll(shortNameToFQN.get(name));
                 }
@@ -833,9 +796,9 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
                 continue;
             }
 
-            if (isRecursiveField(fieldFQN, fieldType)) {
+            if (StateFieldCoverageUtils.isRecursiveField(fieldFQN, fieldType)) {
                 recursiveFields.add(fieldFQN);
-                String classContext = extractClassContextFromFieldFQN(fieldFQN);
+                String classContext = StateFieldCoverageUtils.extractClassContextFromFieldFQN(fieldFQN);
                 classesWithRecursiveFields.add(classContext);
             }
         }
@@ -853,7 +816,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
             } else if (recursiveFields.contains(fieldFQN)) {
                 iterableFields.add(fieldFQN);
             } else {
-                String classContext = extractClassContextFromFieldFQN(fieldFQN);
+                String classContext = StateFieldCoverageUtils.extractClassContextFromFieldFQN(fieldFQN);
                 if (classesWithRecursiveFields.contains(classContext)) {
                     iterableFields.add(fieldFQN);
                 }
@@ -871,7 +834,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         if ("class_declaration".equals(nodeType)) {
             TSNode nameNode = node.getChildByFieldName("name");
             if (nameNode != null && "identifier".equals(nameNode.getType())) {
-                String className = byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
+                String className = StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
                 String newClassContext = classContext.isEmpty()
                         ? (packageName.isEmpty() ? className : packageName + "." + className)
                         : classContext + "." + className;
@@ -901,7 +864,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
                 } else if ("variable_declarator".equals(childType)) {
                     TSNode identifier = child.getChild(0);
                     if (identifier != null && "identifier".equals(identifier.getType())) {
-                        fieldNames.add(byteSubstring(sourceCode, identifier.getStartByte(),
+                        fieldNames.add(StateFieldCoverageUtils.byteSubstring(sourceCode, identifier.getStartByte(),
                                 identifier.getEndByte()));
                     }
                 }
@@ -927,7 +890,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
 
     private String extractTypeName(TSNode typeNode, String sourceCode) {
         if ("type_identifier".equals(typeNode.getType())) {
-            return byteSubstring(sourceCode, typeNode.getStartByte(), typeNode.getEndByte());
+            return StateFieldCoverageUtils.byteSubstring(sourceCode, typeNode.getStartByte(), typeNode.getEndByte());
         } else if ("array_type".equals(typeNode.getType())) {
             TSNode elementType = typeNode.getChild(0);
             if (elementType != null) {
@@ -936,27 +899,10 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         } else if ("generic_type".equals(typeNode.getType())) {
             TSNode identifier = typeNode.getChild(0);
             if (identifier != null && "type_identifier".equals(identifier.getType())) {
-                return byteSubstring(sourceCode, identifier.getStartByte(), identifier.getEndByte());
+                return StateFieldCoverageUtils.byteSubstring(sourceCode, identifier.getStartByte(), identifier.getEndByte());
             }
         }
-        return byteSubstring(sourceCode, typeNode.getStartByte(), typeNode.getEndByte());
-    }
-
-    private boolean isRecursiveField(String fieldFQN, String fieldType) {
-        String classContext = extractClassContextFromFieldFQN(fieldFQN);
-        if (classContext.isEmpty()) {
-            return false;
-        }
-        String simpleClassName = classContext.substring(classContext.lastIndexOf('.') + 1);
-        return fieldType.equals(simpleClassName);
-    }
-
-    private String extractClassContextFromFieldFQN(String fieldFQN) {
-        int lastDot = fieldFQN.lastIndexOf('.');
-        if (lastDot > 0) {
-            return fieldFQN.substring(0, lastDot);
-        }
-        return "";
+        return StateFieldCoverageUtils.byteSubstring(sourceCode, typeNode.getStartByte(), typeNode.getEndByte());
     }
 
     private boolean isCollectionType(String typeName) {
@@ -1011,7 +957,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
             return;
         }
 
-        String methodName = byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
+        String methodName = StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
 
         if (containsMethodCall(methodNode, sourceCode, methodName)) {
             Set<String> fieldsInMethod = new HashSet<>();
@@ -1026,7 +972,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         if ("method_invocation".equals(nodeType)) {
             TSNode nameNode = node.getChildByFieldName("name");
             if (nameNode != null && "identifier".equals(nameNode.getType())) {
-                String name = byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
+                String name = StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
                 if (methodName.equals(name)) {
                     return true;
                 }
@@ -1054,7 +1000,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
                     TSNode pkgChild = child.getChild(j);
                     if ("scoped_identifier".equals(pkgChild.getType())
                             || "identifier".equals(pkgChild.getType())) {
-                        return byteSubstring(sourceCode, pkgChild.getStartByte(), pkgChild.getEndByte());
+                        return StateFieldCoverageUtils.byteSubstring(sourceCode, pkgChild.getStartByte(), pkgChild.getEndByte());
                     }
                 }
             }
@@ -1072,7 +1018,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
                 for (int j = 0; j < importChildCount; j++) {
                     TSNode importChild = child.getChild(j);
                     if ("scoped_identifier".equals(importChild.getType())) {
-                        String fullImport = byteSubstring(sourceCode, importChild.getStartByte(),
+                        String fullImport = StateFieldCoverageUtils.byteSubstring(sourceCode, importChild.getStartByte(),
                                 importChild.getEndByte());
                         int lastDot = fullImport.lastIndexOf('.');
                         if (lastDot >= 0) {
@@ -1208,7 +1154,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         if ("class_declaration".equals(nodeType)) {
             TSNode nameNode = node.getChildByFieldName("name");
             if (nameNode != null && "identifier".equals(nameNode.getType())) {
-                return byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
+                return StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(), nameNode.getEndByte());
             }
         }
 
@@ -1251,7 +1197,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
                     if (child != null && "variable_declarator".equals(child.getType())) {
                         TSNode nameNode = child.getChildCount() > 0 ? child.getChild(0) : null;
                         if (nameNode != null && "identifier".equals(nameNode.getType())) {
-                            String varName = byteSubstring(sourceCode, nameNode.getStartByte(),
+                            String varName = StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(),
                                     nameNode.getEndByte());
                             if (type != null) {
                                 variableTypes.put(varName, type);
@@ -1279,11 +1225,11 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         String nodeType = typeNode.getType();
 
         if ("type_identifier".equals(nodeType)) {
-            return byteSubstring(sourceCode, typeNode.getStartByte(), typeNode.getEndByte());
+            return StateFieldCoverageUtils.byteSubstring(sourceCode, typeNode.getStartByte(), typeNode.getEndByte());
         } else if ("generic_type".equals(nodeType)) {
             TSNode typeIdentifier = typeNode.getChildCount() > 0 ? typeNode.getChild(0) : null;
             if (typeIdentifier != null && "type_identifier".equals(typeIdentifier.getType())) {
-                return byteSubstring(sourceCode, typeIdentifier.getStartByte(), typeIdentifier.getEndByte());
+                return StateFieldCoverageUtils.byteSubstring(sourceCode, typeIdentifier.getStartByte(), typeIdentifier.getEndByte());
             }
         }
 
@@ -1319,7 +1265,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
                 if (isObjectOfTargetClassType || !assertOnlyTargetClassMethods) {
                     TSNode nameNode = node.getChildByFieldName("name");
                     if (nameNode != null && "identifier".equals(nameNode.getType())) {
-                        String methodName = byteSubstring(sourceCode, nameNode.getStartByte(),
+                        String methodName = StateFieldCoverageUtils.byteSubstring(sourceCode, nameNode.getStartByte(),
                                 nameNode.getEndByte());
 
                         String methodClassPath = classPath;
@@ -1345,7 +1291,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
                                 if (targetFields.contains(fqn)) {
                                     accessedFields.add(fqn);
                                 } else {
-                                    String normalized = mapFieldNameToFQN(extractShortFieldName(fqn),
+                                    String normalized = StateFieldCoverageUtils.mapFieldNameToFQN(StateFieldCoverageUtils.extractShortFieldName(fqn),
                                             targetFields);
                                     if (normalized != null) {
                                         accessedFields.add(normalized);
@@ -1387,9 +1333,9 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
                         || isTargetClassType(variableName, variableTypes, targetClassInfo, testPackage)) {
                     TSNode fieldNode = node.getChildByFieldName("field");
                     if (fieldNode != null && "identifier".equals(fieldNode.getType())) {
-                        String fieldName = byteSubstring(sourceCode, fieldNode.getStartByte(),
+                        String fieldName = StateFieldCoverageUtils.byteSubstring(sourceCode, fieldNode.getStartByte(),
                                 fieldNode.getEndByte());
-                        String fqn = mapFieldNameToFQN(fieldName, allFields);
+                        String fqn = StateFieldCoverageUtils.mapFieldNameToFQN(fieldName, allFields);
                         if (fqn != null) {
                             fields.add(fqn);
                         }
@@ -1417,7 +1363,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
             String nodeType = node.getType();
 
             if ("identifier".equals(nodeType)) {
-                return byteSubstring(sourceCode, node.getStartByte(), node.getEndByte());
+                return StateFieldCoverageUtils.byteSubstring(sourceCode, node.getStartByte(), node.getEndByte());
             } else if ("method_invocation".equals(nodeType) || "field_access".equals(nodeType)) {
                 return null;
             }
@@ -1448,15 +1394,6 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         }
 
         return targetClassInfo.packageName.equals(testPackage);
-    }
-
-    private String mapFieldNameToFQN(String shortName, Set<String> allFields) {
-        for (String fqn : allFields) {
-            if (fqn.endsWith("." + shortName)) {
-                return fqn;
-            }
-        }
-        return null;
     }
 
     /**
@@ -1502,13 +1439,13 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
 
     private String extractClassNameFromType(TSNode typeNode, String sourceCode) {
         if ("type_identifier".equals(typeNode.getType())) {
-            return byteSubstring(sourceCode, typeNode.getStartByte(), typeNode.getEndByte());
+            return StateFieldCoverageUtils.byteSubstring(sourceCode, typeNode.getStartByte(), typeNode.getEndByte());
         }
 
         if ("generic_type".equals(typeNode.getType())) {
             TSNode identifier = typeNode.getChild(0);
             if (identifier != null && "type_identifier".equals(identifier.getType())) {
-                return byteSubstring(sourceCode, identifier.getStartByte(), identifier.getEndByte());
+                return StateFieldCoverageUtils.byteSubstring(sourceCode, identifier.getStartByte(), identifier.getEndByte());
             }
         }
 
@@ -1541,17 +1478,4 @@ public class StateFieldCoverageJava extends StateFieldCoverage implements Metric
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Byte-offset aware substring helper
-    // -------------------------------------------------------------------------
-
-    /**
-     * Extract a substring using UTF-8 byte offsets as returned by Tree-sitter.
-     * Tree-sitter reports positions as byte offsets in the UTF-8 encoding of the source,
-     * while Java's {@link String#substring(int, int)} operates on UTF-16 code-unit indices.
-     */
-    private static String byteSubstring(String source, int startByte, int endByte) {
-        byte[] bytes = source.getBytes(StandardCharsets.UTF_8);
-        return new String(bytes, startByte, endByte - startByte, StandardCharsets.UTF_8);
-    }
 }

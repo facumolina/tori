@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  *
  * @see StateFieldCoverageJava
  */
-public abstract class StateFieldCoverage {
+public abstract class StateFieldCoverage implements Metric {
 
     protected List<String> targetClassPaths;
     protected ExecutionLevel executionLevel;
@@ -292,6 +292,26 @@ public abstract class StateFieldCoverage {
     /** Sets the execution level for this metric. */
     public void setExecutionLevel(ExecutionLevel level) {
         this.executionLevel = level;
+    }
+
+    // -------------------------------------------------------------------------
+    // Shared helpers available to all language-specific subclasses
+    // -------------------------------------------------------------------------
+
+    /**
+     * Converts a set of internal FQN strings (possibly with {@code "+"} suffix for
+     * iterable variants) to a set of {@link TargetField} objects.
+     */
+    protected Set<TargetField> toTargetFields(Set<String> fqns) {
+        Set<TargetField> result = new HashSet<>();
+        for (String fqn : fqns) {
+            if (fqn.endsWith("+")) {
+                result.add(new TargetField(fqn.substring(0, fqn.length() - 1), true));
+            } else {
+                result.add(new TargetField(fqn, false));
+            }
+        }
+        return result;
     }
 
     // -------------------------------------------------------------------------
