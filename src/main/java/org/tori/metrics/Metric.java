@@ -8,6 +8,7 @@ import java.util.Properties;
  * All metrics should implement the assess method to evaluate a test case and its oracle.
  */
 public interface Metric {
+    
     /**
      * Assess the quality of an oracle (assertion) in the context of a test case.
      *
