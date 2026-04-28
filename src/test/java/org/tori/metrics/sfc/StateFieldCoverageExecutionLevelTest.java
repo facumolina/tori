@@ -1,7 +1,8 @@
-package org.tori.metrics;
+package org.tori.metrics.sfc;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.tori.metrics.ExecutionLevel;
 
 import java.util.Arrays;
 import java.util.List;
