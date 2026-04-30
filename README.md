@@ -20,15 +20,8 @@ To install tori locally, clone the repository and build the project using Gradle
 git clone https://github.com/facumolina/tori
 cd tori
 ./gradlew build
+./gradlew fatJar # Creates a fat JAR build/libs/tori-1.0.0-all.jar with all dependencies included
 ```
-
-To create a standalone executable JAR with all dependencies:
-
-```bash
-./gradlew fatJar
-```
-
-The fat JAR will be created at `build/libs/tori-1.0.0-all.jar`.
 
 ### Docker
 
@@ -132,55 +125,6 @@ Tori recognizes common JUnit assertion methods, including:
 - `assertTimeout`, `assertTimeoutPreemptively`
 - And more...
 
-## How It Works
-
-1. **Parsing**: Tori uses Tree-sitter's Java grammar to parse the test file into an Abstract Syntax Tree (AST)
-2. **Analysis**: It traverses the AST to find method declarations and identify assertion statements within them
-3. **Reporting**: It outputs the method names along with all assertion statements found in each method
-
-## Project Structure
-
-```
-tori/
-├── build.gradle              # Gradle build configuration
-├── settings.gradle           # Gradle settings
-├── gradle.properties         # Gradle properties
-├── src/
-│   ├── main/
-│   │   └── java/
-│   │       └── org/
-│   │           └── tori/
-│   │               ├── Main.java                    # Entry point
-│   │               ├── TestOracleInspector.java    # Tree-sitter parser logic
-│   │               ├── MethodOracles.java          # Data model
-│   │               └── metrics/
-│   │                   ├── Metric.java              # Metric interface
-│   │                   ├── ExecutionLevel.java      # Execution level enum
-│   │                   ├── StateFieldCoverage.java  # State field coverage metric
-│   │                   └── CheckedVarsMetric.java   # Checked variables metric
-│   └── test/
-│       ├── java/
-│       │   └── org/
-│       │       └── tori/
-│       │           ├── TestOracleInspectorTest.java              # Test suite
-│       │           └── metrics/
-│       │               ├── StateFieldCoverageTest.java            # StateFieldCoverage tests
-│       │               ├── StateFieldCoverageExecutionLevelTest.java
-│       │               ├── CheckedVarsMetricTest.java             # CheckedVarsMetric tests
-│       │               └── CheckedVarsMetricExecutionLevelTest.java
-│       └── resources/
-│           ├── CalculatorTest.java                  # Example test file
-│           ├── StringUtilsTest.java                 # Example test file
-│           ├── IntsListTest.java                    # Example test file
-│           ├── IntsList.java                        # Example target class
-│           ├── state_field_coverage.properties      # Metric config examples
-│           ├── state_field_coverage_test_method.properties
-│           ├── state_field_coverage_test_class.properties
-│           ├── checked_vars_test_method.properties
-│           └── checked_vars_test_class.properties
-```
-
-## License
-
-This project is open source.
-
+---
+## Contact
+If you experience any issues, please submit an issue or contact us at facundom@ucm.es!
