@@ -1,18 +1,24 @@
 # tori
-tori is a test oracle inspector for Java
 
-## Overview
+Tori (Test Oracle Inspector) is a static analysis tool for assessing the quality of test oracles. 
+Given a target test file, it uses static analysis to identify assertion statements and compute metrics that evaluate how well the oracles test the behavior of the system under test. Tori is designed to be extensible, allowing users to implement custom metrics for oracle assessment.
 
-Tori is a command-line tool that uses Tree-sitter to parse JUnit test suites and identify test oracles (assertion statements). It can analyze entire test files or focus on specific test methods.
+---
 
-## Requirements
+## Setup
+
+### Requirements
 
 - Java 17 or higher
 - Gradle 8.5 or higher (included via Gradle Wrapper)
 
-## Building the Project
+### Local installation
+
+To install tori locally, clone the repository and build the project using Gradle:
 
 ```bash
+git clone https://github.com/facumolina/tori
+cd tori
 ./gradlew build
 ```
 
@@ -24,54 +30,30 @@ To create a standalone executable JAR with all dependencies:
 
 The fat JAR will be created at `build/libs/tori-1.0.0-all.jar`.
 
-## Running Tests
+### Docker
 
-To run the test suite:
+TBD: Docker setup instructions will be added in a future update.
 
-```bash
-./gradlew test
-```
-
-To run tests with detailed output:
-
-```bash
-./gradlew test --info
-```
-
-To view the HTML test report after running tests, open the following file in your browser:
-
-```
-build/reports/tests/test/index.html
-```
-
-The test suite includes tests that verify the correct number of assertions are recovered from example test files located in `src/test/resources/`.
-
+---
 ## Usage
 
-### Using Gradle
+To assess the test oracles in a test file, you will need to specify the path to the test file and optionally the specific test method you want to analyze. You can also specify a metric for oracle assessment along with its configuration.
 
-Analyze all test methods in a file:
+### Example Usage
+
+For example, to analyze all test methods in a file using the StateFieldCoverage metric with a specific configuration:
+
 ```bash
-./gradlew run --args="-t <path-to-test-file.java>"
+java -jar build/libs/tori-1.0.0-all.jar
+  -t src/test/resources/IntsListTest.java 
+  --metric org.tori.metrics.StateFieldCoverage 
+  --metric-config src/test/resources/state_field_coverage.properties
 ```
 
-Analyze a specific test method:
+Or, using Gradle to run the analysis:
+
 ```bash
-./gradlew run --args="-t <path-to-test-file.java> -m <test-method-name>"
-```
-
-### Using the Standalone JAR
-
-After building the fat JAR:
-
-Analyze all test methods:
-```bash
-java -jar build/libs/tori-1.0.0-all.jar -t <path-to-test-file.java>
-```
-
-Analyze a specific test method:
-```bash
-java -jar build/libs/tori-1.0.0-all.jar -t <path-to-test-file.java> -m <test-method-name>
+./gradlew run --args="-t src/test/resources/IntsListTest.java -m testMultipleFields --metric org.tori.metrics.StateFieldCoverage --metric-config src/test/resources/state_field_coverage.properties"
 ```
 
 ### Command-Line Options
@@ -136,158 +118,6 @@ Metrics can be executed at three different levels:
 - **assert** (default): The metric is computed individually for each assertion statement
 - **test_method**: The metric is computed treating all assertions in a test method as a single one (computes the union of accessed fields or checked variables)
 - **test_class**: The metric is computed treating all assertions in a test class as a single one (computes the union across all methods). Note: This level is not allowed when analyzing a specific test method.
-
-### Example Metric Configuration Files
-
-**state_field_coverage.properties**:
-```properties
-target_class=src/test/resources/IntsList.java
-exec_level=assert
-```
-
-**state_field_coverage_test_method.properties**:
-```properties
-target_class=src/test/resources/IntsList.java
-exec_level=test_method
-```
-
-**state_field_coverage_iterable.properties**:
-```properties
-target_class=src/test/resources/IntsList.java
-exec_level=assert
-iterable_field_tracking=true
-```
-
-**state_field_coverage_multiple_classes.properties**:
-```properties
-target_class=src/test/resources/IntsList.java,src/test/resources/Person.java
-exec_level=assert
-iterable_field_tracking=false
-```
-
-**checked_vars_test_class.properties**:
-```properties
-exec_level=test_class
-```
-
-## Examples
-
-### Example 1: Analyze all test methods
-
-```bash
-./gradlew run --args="-t src/test/resources/CalculatorTest.java"
-```
-
-Output:
-```
-Test Method: testAddition
-  - assertEquals(5, result);
-  - assertTrue(result > 0);
-
-Test Method: testSubtraction
-  - assertEquals(2, result);
-  - assertNotNull(calc);
-
-Test Method: testMultiplication
-  - assertEquals(20, result);
-  - assertFalse(result < 0);
-...
-```
-
-### Example 2: Analyze a specific test method
-
-```bash
-./gradlew run --args="-t src/test/resources/CalculatorTest.java -m testAddition"
-```
-
-Output:
-```
-Test Method: testAddition
-  - assertEquals(5, result);
-  - assertTrue(result > 0);
-```
-
-### Example 3: Use StateFieldCoverage metric with assert level
-
-```bash
-./gradlew run --args="-t src/test/resources/IntsListTest.java -m testMultipleFields --metric org.tori.metrics.StateFieldCoverage --metric-config src/test/resources/state_field_coverage.properties"
-```
-
-Output:
-```
-Target class: src/test/resources/IntsList.java
-Total target fields: 4 [next, item, size, header]
-Execution level: assert
-
-Test Method: testMultipleFields
-  - assertTrue(l.getHeader() != null && l.getSize() == 2); [score: 0.50, accessed fields: 2 [size, header]]
-```
-
-### Example 4: Use StateFieldCoverage metric with test_method level
-
-```bash
-./gradlew run --args="-t src/test/resources/IntsListTest.java -m testAllFields --metric org.tori.metrics.StateFieldCoverage --metric-config src/test/resources/state_field_coverage_test_method.properties"
-```
-
-Output:
-```
-Target class: src/test/resources/IntsList.java
-Total target fields: 4 [next, item, size, header]
-Execution level: test_method
-
-Test Method: testAllFields
-  All assertions [score: 1.00, accessed fields: 4 [next, item, size, header]]
-  Total assertions: 1
-```
-
-### Example 5: Use StateFieldCoverage metric with test_class level
-
-```bash
-./gradlew run --args="-t src/test/resources/IntsListTest.java --metric org.tori.metrics.StateFieldCoverage --metric-config src/test/resources/state_field_coverage_test_class.properties"
-```
-
-Output:
-```
-Target class: src/test/resources/IntsList.java
-Total target fields: 4 [next, item, size, header]
-Execution level: test_class
-
-Test Class Assessment:
-  All assertions [score: 1.00, accessed fields: 4 [next, item, size, header]]
-  Total assertions: 11
-```
-
-### Example 6: Use StateFieldCoverage with iterable field tracking
-
-```bash
-./gradlew run --args="-t src/test/resources/IntsListTest.java -m testCheckSize --metric org.tori.metrics.StateFieldCoverage --metric-config src/test/resources/state_field_coverage_iterable.properties"
-```
-
-Output:
-```
-Target class: src/test/resources/IntsList.java
-Total target fields: 6 [com.example.IntsList.Node.item, com.example.IntsList.header, com.example.IntsList.Node.item+, com.example.IntsList.Node.next+, com.example.IntsList.Node.next, com.example.IntsList.size]
-Execution level: assert
-Iterable field tracking: enabled
-
-Test Method: testCheckSize
-  - assertTrue(l.checkSize()); [score: 0.67, accessed fields: 4 [com.example.IntsList.header, com.example.IntsList.Node.next+, com.example.IntsList.Node.next, com.example.IntsList.size]]
-```
-
-In this example, the `checkSize()` method iterates over the list using a while loop, which accesses the `next` field. With iterable field tracking enabled, both the regular label (`next`) and the special iteration label (`next+`) are covered. The method accesses 4 out of 6 target fields (including special labels), achieving a score of 0.67.
-
-### Example 7: Use CheckedVarsMetric with test_class level
-
-```bash
-./gradlew run --args="-t src/test/resources/CalculatorTest.java --metric org.tori.metrics.CheckedVarsMetric --metric-config src/test/resources/checked_vars_test_class.properties"
-```
-
-Output:
-```
-Test Class Assessment:
-  All assertions [score: 1.00]
-  Total assertions: 7
-```
 
 ## Supported Assertions
 
