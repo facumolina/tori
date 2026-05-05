@@ -572,7 +572,7 @@ public class StateFieldCoverageJava extends StateFieldCoverage {
                 List<MethodContext> methods = findAllMethodsWithClassContext(rootNode, classSource, methodName,
                         packageName, "");
                 if (!methods.isEmpty()) {
-                    accessedFields = extractFieldAccessFromAllMethodsNamed(classSource, methodName);
+                    accessedFields = extractFieldAccessFromAllMethodsNamed(classPath, classSource, methodName);
                 } else {
                     String superclassName = findTopLevelSuperclassName(rootNode, classSource);
                     if (superclassName != null) {
@@ -593,7 +593,8 @@ public class StateFieldCoverageJava extends StateFieldCoverage {
         return accessedFields;
     }
 
-    private Set<String> extractFieldAccessFromAllMethodsNamed(String classSource, String methodName) {
+    private Set<String> extractFieldAccessFromAllMethodsNamed(String classPath, String classSource,
+                                                              String methodName) {
         Set<String> allAccessedFields = new HashSet<>();
 
         TSTree tree = parser.parseString(null, classSource);
@@ -601,6 +602,15 @@ public class StateFieldCoverageJava extends StateFieldCoverage {
 
         Set<String> allFields = extractFieldsFromClass(classSource);
         String packageName = extractPackageName(rootNode, classSource);
+        Map<String, String> imports = extractImports(rootNode, classSource);
+        Map<String, String> fieldTypes = extractFieldTypes(rootNode, classSource, packageName, "");
+
+        // Build a short-name to type map so we can look up receiver types for method invocations
+        Map<String, String> fieldShortNameToType = new HashMap<>();
+        for (Map.Entry<String, String> entry : fieldTypes.entrySet()) {
+            String shortName = entry.getKey().substring(entry.getKey().lastIndexOf('.') + 1);
+            fieldShortNameToType.put(shortName, entry.getValue());
+        }
 
         List<MethodContext> methods = findAllMethodsWithClassContext(rootNode, classSource, methodName,
                 packageName, "");
@@ -627,6 +637,26 @@ public class StateFieldCoverageJava extends StateFieldCoverage {
                     localVars);
             allAccessedFields.addAll(methodFields);
 
+            // Recursively follow method invocations on field objects to collect transitive field accesses
+            List<String[]> invocations = new ArrayList<>();
+            findMethodInvocationsOnFields(methodContext.methodNode, classSource, invocations, localVars);
+            for (String[] invocation : invocations) {
+                String objectName = invocation[0];
+                String invokedMethod = invocation[1];
+                String fieldType = fieldShortNameToType.get(objectName);
+                if (fieldType != null) {
+                    String resolvedClassPath = resolveClassPath(fieldType, packageName, imports,
+                            Paths.get(classPath).normalize());
+                    if (resolvedClassPath != null) {
+                        // Cycle-safety: getFieldsAccessedByMethod caches an empty set for
+                        // (resolvedClassPath, invokedMethod) before recursing, so any circular
+                        // call chain (A->B->A) will terminate when the cached entry is returned.
+                        Set<String> transitiveFields = getFieldsAccessedByMethod(resolvedClassPath, invokedMethod);
+                        allAccessedFields.addAll(transitiveFields);
+                    }
+                }
+            }
+
             if (iterableFieldTrackingEnabled) {
                 Set<String> iteratedFields = findIteratedFields(methodContext.methodNode, classSource,
                         shortNameToFQN, localVars);
@@ -637,6 +667,39 @@ public class StateFieldCoverageJava extends StateFieldCoverage {
         }
 
         return allAccessedFields;
+    }
+
+    /**
+     * Collects all method invocations in a method body where the receiver is a simple identifier
+     * that is not a local variable (i.e. it is a field). Each entry in {@code invocations} is a
+     * two-element array {@code [objectName, methodName]}.
+     */
+    private void findMethodInvocationsOnFields(TSNode node, String sourceCode,
+                                               List<String[]> invocations, Set<String> localVars) {
+        if (node == null) {
+            return;
+        }
+
+        String nodeType = node.getType();
+
+        if ("method_invocation".equals(nodeType)) {
+            TSNode objectNode = node.getChildByFieldName("object");
+            TSNode nameNode = node.getChildByFieldName("name");
+            if (objectNode != null && nameNode != null && "identifier".equals(nameNode.getType())) {
+                String objectName = extractIdentifierFromExpression(objectNode, sourceCode);
+                if (objectName != null && !localVars.contains(objectName)) {
+                    String invokedMethodName = StateFieldCoverageUtils.byteSubstring(sourceCode,
+                            nameNode.getStartByte(), nameNode.getEndByte());
+                    invocations.add(new String[]{objectName, invokedMethodName});
+                }
+            }
+        }
+
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TSNode child = node.getChild(i);
+            findMethodInvocationsOnFields(child, sourceCode, invocations, localVars);
+        }
     }
 
     private List<MethodContext> findAllMethodsWithClassContext(TSNode node, String sourceCode,
