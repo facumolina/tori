@@ -648,6 +648,9 @@ public class StateFieldCoverageJava extends StateFieldCoverage {
                     String resolvedClassPath = resolveClassPath(fieldType, packageName, imports,
                             Paths.get(classPath).normalize());
                     if (resolvedClassPath != null) {
+                        // Cycle-safety: getFieldsAccessedByMethod caches an empty set for
+                        // (resolvedClassPath, invokedMethod) before recursing, so any circular
+                        // call chain (A->B->A) will terminate when the cached entry is returned.
                         Set<String> transitiveFields = getFieldsAccessedByMethod(resolvedClassPath, invokedMethod);
                         allAccessedFields.addAll(transitiveFields);
                     }
