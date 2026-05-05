@@ -53,14 +53,17 @@ class StateFieldCoverageFieldAccessedInMethodTest {
         assertTrue(metric.getLastAccessedFields().size() > 0, "Should have identified accessed fields");
 
         assertTrue(metric.getLastAccessedFields().stream().anyMatch(f -> f.contains("ByteArrayInputStreamWithPos.position")),
-            "Should have identified access to 'position' field");
+            "Should have identified access to 'ByteArrayInputStreamWithPos.position' field");
 
         assertTrue(metric.getLastAccessedFields().stream().anyMatch(f -> f.contains("ByteArrayInputStreamWithPos.count")),
-            "Should have identified access to 'count' field");
+            "Should have identified access to 'ByteArrayInputStreamWithPos.count' field");
 
         assertTrue(metric.getLastAccessedFields().stream().anyMatch(f -> f.contains("ByteArrayInputStreamWithPos.segment")),
-            "Should have identified access to 'segment' field");
+            "Should have identified access to 'ByteArrayInputStreamWithPos.segment' field");
         
+        // Ensure field org.apache.flink.core.memory.MemorySegment.address is accessed
+        assertTrue(metric.getLastAccessedFields().stream().anyMatch(f -> f.contains("MemorySegment.address")),
+            "Should have identified access to 'MemorySegment.address' field");
     }
 
 
