@@ -14,8 +14,13 @@ import org.tori.metrics.StateFieldCoverage;
 import java.lang.ClassNotFoundException;
 
 public class Main {
+    
     private static final String VERSION = "1.0.0";
     
+    /**
+     * Helper method to map metric class names to actual Class objects, 
+     * with support for language-specific variants.
+     */
     private static Class<? extends StateFieldCoverage> getMetricClass(String metricName, String testFilePath) throws ClassNotFoundException {
         // For simplicity, we only support StateFieldCoverage for now
         if ("org.tori.metrics.StateFieldCoverage".equals(metricName)) {
@@ -27,50 +32,56 @@ public class Main {
         throw new ClassNotFoundException("Metric class not found: " + metricName);
     }
 
+    /**
+     * Builds the command-line options for the application.
+     *
+     * @return the configured Options object
+     */
+    private static Options buildOptions() {
+        Options options = new Options();
+        
+        options.addOption(Option.builder("t")
+                .longOpt("test-file")
+                .hasArg()
+                .required()
+                .desc("Path to the test file (required)")
+                .argName("FILE")
+                .build());
+        
+        options.addOption(Option.builder("m")
+                .longOpt("test-method")
+                .hasArg()
+                .required(false)
+                .desc("Name of the specific test method to analyze (optional)")
+                .argName("METHOD")
+                .build());
+        
+        options.addOption(Option.builder("metric")
+                .longOpt("metric")
+                .hasArg()
+                .required(false)
+                .desc("Class name of the metric to use for oracle assessment (optional)")
+                .argName("METRIC_CLASS")
+                .build());
+        
+        options.addOption(Option.builder("mc")
+                .longOpt("metric-config")
+                .hasArg()
+                .required(false)
+                .desc("Path to the properties file with metric configuration (optional)")
+                .argName("CONFIG_FILE")
+                .build());
+        
+        return options;
+    }
+
     public static void main(String[] args) {
         // Print banner
         System.out.println("Tori " + VERSION + " - Test Oracle Inspector");
         System.out.println();
         
         // Define command-line options
-        Options options = new Options();
-        
-        Option testFileOption = Option.builder("t")
-                .longOpt("test-file")
-                .hasArg()
-                .required()
-                .desc("Path to the test file (required)")
-                .argName("FILE")
-                .build();
-        
-        Option testMethodOption = Option.builder("m")
-                .longOpt("test-method")
-                .hasArg()
-                .required(false)
-                .desc("Name of the specific test method to analyze (optional)")
-                .argName("METHOD")
-                .build();
-        
-        Option metricOption = Option.builder("metric")
-                .longOpt("metric")
-                .hasArg()
-                .required(false)
-                .desc("Class name of the metric to use for oracle assessment (optional)")
-                .argName("METRIC_CLASS")
-                .build();
-        
-        Option metricConfigOption = Option.builder("mc")
-                .longOpt("metric-config")
-                .hasArg()
-                .required(false)
-                .desc("Path to the properties file with metric configuration (optional)")
-                .argName("CONFIG_FILE")
-                .build();
-        
-        options.addOption(testFileOption);
-        options.addOption(testMethodOption);
-        options.addOption(metricOption);
-        options.addOption(metricConfigOption);
+        Options options = buildOptions();
 
         // Parse command-line arguments
         CommandLineParser parser = new DefaultParser();
