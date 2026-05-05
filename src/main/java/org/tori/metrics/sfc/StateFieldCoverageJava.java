@@ -756,7 +756,20 @@ public class StateFieldCoverageJava extends StateFieldCoverage {
 
     private boolean isMethodName(TSNode identifierNode, TSNode parent) {
         String parentType = parent.getType();
-        return "method_invocation".equals(parentType) || "method_declaration".equals(parentType);
+        if ("method_declaration".equals(parentType)) {
+            return true;
+        }
+        if ("method_invocation".equals(parentType)) {
+            // Only treat as a method name if this identifier is the 'name' field of the
+            // invocation (i.e. the callee), not the 'object' field (i.e. the receiver).
+            // For example, in "segment.get(...)", 'segment' is the object and must NOT
+            // be filtered out as a method name, while 'get' is the name and must be.
+            TSNode nameChild = parent.getChildByFieldName("name");
+            return nameChild != null
+                    && nameChild.getStartByte() == identifierNode.getStartByte()
+                    && nameChild.getEndByte() == identifierNode.getEndByte();
+        }
+        return false;
     }
 
     private Set<String> identifyIterableFields(String classPath, String classSource, Set<String> allFields) {
