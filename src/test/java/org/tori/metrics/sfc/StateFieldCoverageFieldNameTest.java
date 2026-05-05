@@ -1,5 +1,6 @@
 package org.tori.metrics.sfc;
 
+import org.tori.metrics.StateFieldCoverage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

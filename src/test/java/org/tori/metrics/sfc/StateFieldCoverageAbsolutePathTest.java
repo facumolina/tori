@@ -1,5 +1,7 @@
 package org.tori.metrics.sfc;
 
+import org.tori.metrics.StateFieldCoverage;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

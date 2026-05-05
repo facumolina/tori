@@ -1,5 +1,6 @@
 package org.tori.metrics.sfc;
 
+import org.tori.metrics.StateFieldCoverage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -51,13 +52,13 @@ class StateFieldCoverageFieldAccessedInMethodTest {
 
         assertTrue(metric.getLastAccessedFields().size() > 0, "Should have identified accessed fields");
 
-        assertTrue(metric.getLastAccessedFields().stream().anyMatch(f -> f.contains("position")),
+        assertTrue(metric.getLastAccessedFields().stream().anyMatch(f -> f.contains("ByteArrayInputStreamWithPos.position")),
             "Should have identified access to 'position' field");
 
-        assertTrue(metric.getLastAccessedFields().stream().anyMatch(f -> f.contains("count")),
+        assertTrue(metric.getLastAccessedFields().stream().anyMatch(f -> f.contains("ByteArrayInputStreamWithPos.count")),
             "Should have identified access to 'count' field");
 
-        assertTrue(metric.getLastAccessedFields().stream().anyMatch(f -> f.contains("segment")),
+        assertTrue(metric.getLastAccessedFields().stream().anyMatch(f -> f.contains("ByteArrayInputStreamWithPos.segment")),
             "Should have identified access to 'segment' field");
         
     }

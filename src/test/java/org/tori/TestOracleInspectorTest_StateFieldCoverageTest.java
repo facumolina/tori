@@ -1,8 +1,8 @@
 package org.tori;
 
+import org.tori.metrics.StateFieldCoverage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.tori.metrics.sfc.StateFieldCoverage;
 import org.tori.metrics.sfc.StateFieldCoverageJava;
 
 import java.io.IOException;

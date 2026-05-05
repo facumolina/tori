@@ -1,7 +1,9 @@
-package org.tori.metrics.sfc;
+package org.tori.metrics;
 
 import org.tori.metrics.ExecutionLevel;
 import org.tori.metrics.Metric;
+
+import org.tori.metrics.sfc.TargetField;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -45,7 +47,7 @@ public abstract class StateFieldCoverage implements Metric {
     protected Set<String> lastLoadedDependencyClasses;
     protected Set<String> lastFailedDependencyClasses;
 
-    protected StateFieldCoverage() {
+    public StateFieldCoverage() {
         this.targetClassPaths = new ArrayList<>();
         this.executionLevel = ExecutionLevel.ASSERT;
         this.detailedReportingEnabled = true;

@@ -10,9 +10,23 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
 
+import org.tori.metrics.StateFieldCoverage;
+import java.lang.ClassNotFoundException;
+
 public class Main {
     private static final String VERSION = "1.0.0";
     
+    private static Class<? extends StateFieldCoverage> getMetricClass(String metricName, String testFilePath) throws ClassNotFoundException {
+        // For simplicity, we only support StateFieldCoverage for now
+        if ("org.tori.metrics.StateFieldCoverage".equals(metricName)) {
+            if (testFilePath != null && testFilePath.endsWith(".java")) {
+                return org.tori.metrics.sfc.StateFieldCoverageJava.class;
+            }
+            throw new IllegalArgumentException("Unsupported language for StateFieldCoverage metric. Currently only Java (.java) files are supported.");
+        }
+        throw new ClassNotFoundException("Metric class not found: " + metricName);
+    }
+
     public static void main(String[] args) {
         // Print banner
         System.out.println("Tori " + VERSION + " - Test Oracle Inspector");
@@ -113,7 +127,8 @@ public class Main {
             org.tori.metrics.Metric metric = null;
             if (metricClassName != null) {
                 try {
-                    Class<?> metricClass = Class.forName(metricClassName);
+                    Class<?> metricClass = getMetricClass(metricClassName, testFilePath);
+                    //Class<?> metricClass = Class.forName(metricClassName);
                     metric = (org.tori.metrics.Metric) metricClass.getDeclaredConstructor().newInstance();
                     
                     // Load metric configuration if provided
@@ -132,8 +147,8 @@ public class Main {
                         
                         // Print Metric Configuration section
                         System.out.println("Metric Configuration:");
-                        if (metric instanceof org.tori.metrics.sfc.StateFieldCoverage) {
-                            org.tori.metrics.sfc.StateFieldCoverage sfcMetric = (org.tori.metrics.sfc.StateFieldCoverage) metric;
+                        if (metric instanceof StateFieldCoverage) {
+                            StateFieldCoverage sfcMetric = (StateFieldCoverage) metric;
                             java.util.List<String> paths = sfcMetric.getTargetClassPaths();
                             if (paths.size() == 1) {
                                 System.out.println("  target_class: " + paths.get(0));
@@ -202,6 +217,7 @@ public class Main {
                     System.err.println("Error: Metric class must have a public no-argument constructor: " + metricClassName);
                     System.exit(1);
                 } catch (InstantiationException | IllegalAccessException e) {
+                    e.printStackTrace();
                     System.err.println("Error: Cannot instantiate metric class: " + metricClassName);
                     System.err.println("  Ensure the class is concrete and has a public no-argument constructor");
                     System.exit(1);
@@ -234,8 +250,8 @@ public class Main {
                         double score = metric.assessMultiple(allTestCases.toString(), allOracles);
                         System.out.println("Test Class Assessment:");
                         
-                        if (metric instanceof org.tori.metrics.sfc.StateFieldCoverage) {
-                            org.tori.metrics.sfc.StateFieldCoverage sfcMetric = (org.tori.metrics.sfc.StateFieldCoverage) metric;
+                        if (metric instanceof StateFieldCoverage) {
+                            StateFieldCoverage sfcMetric = (StateFieldCoverage) metric;
                             java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
                             java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
                             System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
@@ -258,8 +274,8 @@ public class Main {
                         } else {
                             double score = metric.assessMultiple(methodOracles.testCaseSource(), methodOracles.oracles());
                             
-                            if (metric instanceof org.tori.metrics.sfc.StateFieldCoverage) {
-                                org.tori.metrics.sfc.StateFieldCoverage sfcMetric = (org.tori.metrics.sfc.StateFieldCoverage) metric;
+                            if (metric instanceof StateFieldCoverage) {
+                                StateFieldCoverage sfcMetric = (StateFieldCoverage) metric;
                                 java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
                                 java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
                                 System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
@@ -286,8 +302,8 @@ public class Main {
                                     double score = metric.assess(methodOracles.testCaseSource(), oracle);
                                     
                                     // If the metric is StateFieldCoverage, print detailed field information
-                                    if (metric instanceof org.tori.metrics.sfc.StateFieldCoverage) {
-                                        org.tori.metrics.sfc.StateFieldCoverage sfcMetric = (org.tori.metrics.sfc.StateFieldCoverage) metric;
+                                    if (metric instanceof org.tori.metrics.StateFieldCoverage) {
+                                        org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
                                         java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
                                         java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
                                         System.out.println("  - " + oracle);
