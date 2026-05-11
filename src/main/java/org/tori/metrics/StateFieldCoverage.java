@@ -2,6 +2,7 @@ package org.tori.metrics;
 
 import org.tori.metrics.ExecutionLevel;
 import org.tori.metrics.Metric;
+import org.tori.MethodOracles;
 
 import org.tori.metrics.sfc.TargetField;
 
@@ -378,4 +379,36 @@ public abstract class StateFieldCoverage implements Metric {
         }
         return resolveFallbackClassPaths(testCase);
     }
+
+    // -------------------------------------------------------------------------
+    // Report methods
+    // -------------------------------------------------------------------------
+    public void reportAssertLevel(double score, String oracle) {
+        Set<String> accessedFields = getLastAccessedFields();
+        Set<String> missingFields = getLastMissingFields();
+        System.out.println("  - oracle: " + oracle);
+        System.out.println("    state_field_coverage_score: " + String.format("%.2f", score));
+        System.out.println("    total_assertions: 1");
+        System.out.println("    covered_fields: " + accessedFields.size() + " " + accessedFields);
+        System.out.println("    uncovered_fields: " + missingFields.size() + " " + missingFields);
+    }
+
+    public void reportTestMethodLevel(double score, MethodOracles methodOracles) {
+        Set<String> accessedFields = getLastAccessedFields();
+        Set<String> missingFields = getLastMissingFields();
+        System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
+        System.out.println("  total_assertions: " + methodOracles.oracles().size());
+        System.out.println("  covered_fields: " + accessedFields.size() + " " + accessedFields);
+        System.out.println("  uncovered_fields: " + missingFields.size() + " " + missingFields);
+    }
+
+    public void reportTestClassLevel(double score, List<String> allOracles) {
+        Set<String> accessedFields = getLastAccessedFields();
+        Set<String> missingFields = getLastMissingFields();
+        System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
+        System.out.println("  total_assertions: " + allOracles.size());
+        System.out.println("  covered_fields: " + accessedFields.size() + " " + accessedFields);
+        System.out.println("  uncovered_fields: " + missingFields.size() + " " + missingFields);
+    }
+
 }

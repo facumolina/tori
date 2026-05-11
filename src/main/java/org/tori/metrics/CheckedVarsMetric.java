@@ -1,5 +1,7 @@
 package org.tori.metrics;
 
+import org.tori.MethodOracles;
+
 import org.treesitter.*;
 
 import java.util.HashSet;
@@ -235,4 +237,25 @@ public class CheckedVarsMetric implements Metric {
         // Return the proportion
         return (double) checkedCount / declaredVars.size();
     }
+
+    // -------------------------------------------------------------------------
+    // Report methods
+    // -------------------------------------------------------------------------
+    public void reportAssertLevel(double score, String oracle) {
+        System.out.print("  - " + oracle + " [score: " + String.format("%.2f", score));
+        System.out.println("]");
+    }
+
+    public void reportTestMethodLevel(double score, MethodOracles methodOracles) {
+        System.out.print("  All assertions [score: " + String.format("%.2f", score));
+        System.out.println("]");
+        System.out.println("  Total assertions: " + methodOracles.oracles().size());
+    }
+
+    public void reportTestClassLevel(double score, List<String> allOracles) {
+        System.out.print("  All assertions [score: " + String.format("%.2f", score));
+        System.out.println("]");
+        System.out.println("  Total assertions: " + allOracles.size());
+    }
+
 }

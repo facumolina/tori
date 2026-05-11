@@ -260,20 +260,7 @@ public class Main {
                     if (!allOracles.isEmpty()) {
                         double score = metric.assessMultiple(allTestCases.toString(), allOracles);
                         System.out.println("Test Class Assessment:");
-                        
-                        if (metric instanceof StateFieldCoverage) {
-                            StateFieldCoverage sfcMetric = (StateFieldCoverage) metric;
-                            java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
-                            java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
-                            System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
-                            System.out.println("  total_assertions: " + allOracles.size());
-                            System.out.println("  covered_fields: " + accessedFields.size() + " " + accessedFields);
-                            System.out.println("  uncovered_fields: " + missingFields.size() + " " + missingFields);
-                        } else {
-                            System.out.print("  All assertions [score: " + String.format("%.2f", score));
-                            System.out.println("]");
-                            System.out.println("  Total assertions: " + allOracles.size());
-                        }
+                        metric.reportTestClassLevel(score, allOracles);
                     }
                     System.out.println();
                 } else if (metric != null && metric.getExecutionLevel() == org.tori.metrics.ExecutionLevel.TEST_METHOD) {
@@ -284,20 +271,7 @@ public class Main {
                             System.out.println("  No assertions found");
                         } else {
                             double score = metric.assessMultiple(methodOracles.testCaseSource(), methodOracles.oracles());
-                            
-                            if (metric instanceof StateFieldCoverage) {
-                                StateFieldCoverage sfcMetric = (StateFieldCoverage) metric;
-                                java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
-                                java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
-                                System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
-                                System.out.println("  total_assertions: " + methodOracles.oracles().size());
-                                System.out.println("  covered_fields: " + accessedFields.size() + " " + accessedFields);
-                                System.out.println("  uncovered_fields: " + missingFields.size() + " " + missingFields);
-                            } else {
-                                System.out.print("  All assertions [score: " + String.format("%.2f", score));
-                                System.out.println("]");
-                                System.out.println("  Total assertions: " + methodOracles.oracles().size());
-                            }
+                            metric.reportTestMethodLevel(score, methodOracles);
                         }
                         System.out.println();
                     }
@@ -309,23 +283,10 @@ public class Main {
                             System.out.println("  No assertions found");
                         } else {
                             for (String oracle : methodOracles.oracles()) {
+                                System.out.println();
                                 if (metric != null) {
                                     double score = metric.assess(methodOracles.testCaseSource(), oracle);
-                                    
-                                    // If the metric is StateFieldCoverage, print detailed field information
-                                    if (metric instanceof org.tori.metrics.StateFieldCoverage) {
-                                        org.tori.metrics.StateFieldCoverage sfcMetric = (org.tori.metrics.StateFieldCoverage) metric;
-                                        java.util.Set<String> accessedFields = sfcMetric.getLastAccessedFields();
-                                        java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
-                                        System.out.println("  - " + oracle);
-                                        System.out.println("    state_field_coverage_score: " + String.format("%.2f", score));
-                                        System.out.println("    total_assertions: 1");
-                                        System.out.println("    covered_fields: " + accessedFields.size() + " " + accessedFields);
-                                        System.out.println("    uncovered_fields: " + missingFields.size() + " " + missingFields);
-                                    } else {
-                                        System.out.print("  - " + oracle + " [score: " + String.format("%.2f", score));
-                                        System.out.println("]");
-                                    }
+                                    metric.reportAssertLevel(score, oracle);
                                 } else {
                                     System.out.println("  - " + oracle);
                                 }

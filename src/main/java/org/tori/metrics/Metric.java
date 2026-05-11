@@ -3,6 +3,8 @@ package org.tori.metrics;
 import java.util.List;
 import java.util.Properties;
 
+import org.tori.MethodOracles;
+
 /**
  * Interface for metrics that assess the quality of test oracles (assertions).
  * All metrics should implement the assess method to evaluate a test case and its oracle.
@@ -65,4 +67,35 @@ public interface Metric {
     default void setExecutionLevel(ExecutionLevel level) {
         // Default implementation does nothing - metrics that support different levels should override this
     }
+
+    /**
+     * Report method for assert level metrics.
+     * 
+     * @param score The computed score for the assertion
+     * @param oracle The oracle (assertion statement) being reported
+     */
+    default void reportAssertLevel(double score, String oracle) {
+        // Default implementation does nothing
+    }
+
+    /**
+     * Report method for test method level metrics.
+     * 
+     * @param score The computed score for the test method (union of all assertions)
+     * @param methodOracles The MethodOracles object containing information about the test method and its assertions
+     */
+    default void reportTestMethodLevel(double score, MethodOracles methodOracles) {
+        // Default implementation does nothing
+    }
+
+    /**
+     * Report method for test class level metrics.
+     * 
+     * @param score The computed score for the test class (union of all assertions)
+     * @param methodOracles The MethodOracles object containing information about the test method and its assertions
+     */
+    default void reportTestClassLevel(double score, List<String> allOracles) {
+        // Default implementation does nothing
+    }
+
 }
