@@ -45,7 +45,7 @@ Below we provide two examples using the StateFieldCoverage metric.
 ### Basic Example
 
 The class [`IntsList`](src/test/resources/IntsList.java) is a simple implementation of a linked list of integers. 
-The test class [`IntsListTest`](src/test/resources/IntsListTest.java) contains several test methods that test the behavior of `IntsList` using assertions.
+The test class [`IntsListTest`](src/test/resources/IntsListTest.java) contains several test methods that test the behavior of `IntsList`.
 
 To analyze oracles in all test methods of `IntsListTest` using the StateFieldCoverage metric with a specific configuration file, you can run the following command:
 
