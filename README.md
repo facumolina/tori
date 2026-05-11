@@ -36,24 +36,31 @@ docker run -it tori
 ---
 ## Usage
 
-To assess the test oracles in a test file, you will need to specify the path to the test file and optionally the specific test method you want to analyze. You can also specify a metric for oracle assessment along with its configuration.
+To assess the test oracles in a test file, you will need to specify: 
+- the path to the test file and optionally the specific test method you want to analyze, 
+- the metric for oracle assessment you want to use along with its configuration.
 
-### Example Usage
+Below we provide two examples using the StateFieldCoverage metric.
 
-For example, to analyze all test methods in a file using the StateFieldCoverage metric with a specific configuration:
+### Basic Example
 
-```bash
-java -jar build/libs/tori-1.0.0-all.jar
-  -t src/test/resources/IntsListTest.java 
-  --metric org.tori.metrics.StateFieldCoverage 
-  --metric-config src/test/resources/state_field_coverage.properties
-```
+The class [`IntsList`](src/test/resources/IntsList.java) is a simple implementation of a linked list of integers. 
+The test class [`IntsListTest`](src/test/resources/IntsListTest.java) contains several test methods that test the behavior of `IntsList` using assertions.
 
-Or, using Gradle to run the analysis:
+To analyze oracles in all test methods of `IntsListTest` using the StateFieldCoverage metric with a specific configuration file, you can run the following command:
 
 ```bash
-./gradlew run --args="-t src/test/resources/IntsListTest.java -m testMultipleFields --metric org.tori.metrics.StateFieldCoverage --metric-config src/test/resources/state_field_coverage.properties"
+java -jar build/libs/tori-1.0.0-all.jar \
+  -t src/test/resources/IntsListTest.java \
+  -metric org.tori.metrics.StateFieldCoverage \
+  -metric-config src/test/resources/state_field_coverage.properties
 ```
+
+This will report, for each assertion in the test class, the proportion of fields in `IntsList` that are accessed by that assertion. The configuration file specifies `IntsList` as the target class and the execution level as `assert`, meaning the metric is computed individually for each assertion statement.
+
+### Real Example
+
+
 
 ### Command-Line Options
 
