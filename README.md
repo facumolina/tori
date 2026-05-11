@@ -20,12 +20,18 @@ To install tori locally, clone the repository and build the project using Gradle
 git clone https://github.com/facumolina/tori
 cd tori
 ./gradlew build
-./gradlew fatJar # Creates a fat JAR build/libs/tori-1.0.0-all.jar with all dependencies included
+./gradlew fatJar # Creates build/libs/tori-1.0.0-all.jar with all dependencies included
 ```
 
 ### Docker
 
-TBD: Docker setup instructions will be added in a future update.
+We provide a `Dockerfile` that can be used to build a docker image with
+tori and all its dependencies. To build and run the docker image,
+execute the following commands:
+```bash
+docker build -t tori .
+docker run -it tori
+```
 
 ---
 ## Usage
