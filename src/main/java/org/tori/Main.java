@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Properties;
 
 import org.tori.utils.ReportStyle;
+import org.tori.metrics.Metric;
 
 import org.tori.metrics.StateFieldCoverage;
 import java.lang.ClassNotFoundException;
@@ -18,21 +19,6 @@ import java.lang.ClassNotFoundException;
 public class Main {
     
     private static final String VERSION = "1.0.0";
-    
-    /**
-     * Helper method to map metric class names to actual Class objects, 
-     * with support for language-specific variants.
-     */
-    private static Class<? extends StateFieldCoverage> getMetricClass(String metricName, String testFilePath) throws ClassNotFoundException {
-        // For simplicity, we only support StateFieldCoverage for now
-        if ("org.tori.metrics.StateFieldCoverage".equals(metricName)) {
-            if (testFilePath != null && testFilePath.endsWith(".java")) {
-                return org.tori.metrics.sfc.StateFieldCoverageJava.class;
-            }
-            throw new IllegalArgumentException("Unsupported language for StateFieldCoverage metric. Currently only Java (.java) files are supported.");
-        }
-        throw new ClassNotFoundException("Metric class not found: " + metricName);
-    }
 
     /**
      * Builds the command-line options for the application.
@@ -116,60 +102,14 @@ public class Main {
 
             String sourceCode = Files.readString(path);
 
-            // Parse and find assertions
+            // Parse and find target oracles
             TestOracleInspector inspector = new TestOracleInspector();
             List<MethodOracles> targetClassOracles = inspector.findOracles(sourceCode, testMethodName);
 
             // Load metric if specified
-            org.tori.metrics.Metric metric = null;
+            Metric metric = null;
             if (metricClassName != null) {
-                try {
-                    Class<?> metricClass = getMetricClass(metricClassName, testFilePath);
-                    //Class<?> metricClass = Class.forName(metricClassName);
-                    metric = (org.tori.metrics.Metric) metricClass.getDeclaredConstructor().newInstance();
-                    
-                    // Load metric configuration if provided
-                    if (metricConfigPath != null) {
-                        Path configPath = Paths.get(metricConfigPath);
-                        if (!Files.exists(configPath)) {
-                            System.err.println("Error: Metric config file not found: " + metricConfigPath);
-                            System.exit(1);
-                        }
-                        
-                        Properties config = new Properties();
-                        try (FileInputStream fis = new FileInputStream(configPath.toFile())) {
-                            config.load(fis);
-                        }
-                        metric.configure(config);
-                        
-                        // Print Metric Configuration section
-                        metric.printConfigurationParams();
-                        System.out.println();
-                        
-                        // Validate execution level constraints
-                        if (metric.getExecutionLevel() == org.tori.metrics.ExecutionLevel.TEST_CLASS && testMethodName != null) {
-                            System.err.println("Error: exec_level 'test_class' is not allowed when a specific test method is specified");
-                            System.exit(1);
-                        }
-                    }
-                } catch (ClassNotFoundException e) {
-                    System.err.println("Error: Metric class not found: " + metricClassName);
-                    System.exit(1);
-                } catch (ClassCastException e) {
-                    System.err.println("Error: Class does not implement org.tori.metrics.Metric: " + metricClassName);
-                    System.exit(1);
-                } catch (NoSuchMethodException e) {
-                    System.err.println("Error: Metric class must have a public no-argument constructor: " + metricClassName);
-                    System.exit(1);
-                } catch (InstantiationException | IllegalAccessException e) {
-                    e.printStackTrace();
-                    System.err.println("Error: Cannot instantiate metric class: " + metricClassName);
-                    System.err.println("  Ensure the class is concrete and has a public no-argument constructor");
-                    System.exit(1);
-                } catch (Exception e) {
-                    System.err.println("Error: Failed to instantiate metric: " + e.getMessage());
-                    System.exit(1);
-                }
+                metric = loadMetric(metricClassName, metricConfigPath, testFilePath, testMethodName);
             }
 
             // Print results
@@ -240,6 +180,81 @@ public class Main {
         }
     }
 
+    /**
+     * Helper method to map metric class names to actual Class objects, 
+     * with support for language-specific variants.
+     */
+    private static Class<? extends StateFieldCoverage> getMetricClass(String metricName, String testFilePath) throws ClassNotFoundException {
+        // For simplicity, we only support StateFieldCoverage for now
+        if ("org.tori.metrics.StateFieldCoverage".equals(metricName)) {
+            if (testFilePath != null && testFilePath.endsWith(".java")) {
+                return org.tori.metrics.sfc.StateFieldCoverageJava.class;
+            }
+            throw new IllegalArgumentException("Unsupported language for StateFieldCoverage metric. Currently only Java (.java) files are supported.");
+        }
+        throw new ClassNotFoundException("Metric class not found: " + metricName);
+    }
+
+    /**
+     * Load a metric instance based on its class name and configuration.
+     * This method handles class loading, instantiation, and configuration of the metric.
+     * 
+     * @param metricClassName the fully qualified class name of the metric to load
+     * @param metricConfigPath the path to the metric configuration file (optional)
+     * @param testFilePath the path to the test file being analyzed (used for language
+     * @param testMethodName the name of the specific test method to analyze (optional)
+     */
+    private static Metric loadMetric(String metricClassName, String metricConfigPath, String testFilePath, String testMethodName) throws Exception {
+        try {
+            Class<?> metricClass = getMetricClass(metricClassName, testFilePath);
+            Metric metric = (Metric) metricClass.getDeclaredConstructor().newInstance();
+            
+            // Load metric configuration if provided
+            if (metricConfigPath != null) {
+                Path configPath = Paths.get(metricConfigPath);
+                if (!Files.exists(configPath)) {
+                    System.err.println("Error: Metric config file not found: " + metricConfigPath);
+                    System.exit(1);
+                }
+                
+                Properties config = new Properties();
+                try (FileInputStream fis = new FileInputStream(configPath.toFile())) {
+                    config.load(fis);
+                }
+                metric.configure(config);
+                
+                // Print Metric Configuration section
+                metric.printConfigurationParams();
+                System.out.println();
+                        
+                // Validate execution level constraints
+                if (metric.getExecutionLevel() == org.tori.metrics.ExecutionLevel.TEST_CLASS && testMethodName != null) {
+                    System.err.println("Error: exec_level 'test_class' is not allowed when a specific test method is specified");
+                    System.exit(1);
+                }
+            }
+
+            return metric;
+        } catch (ClassNotFoundException e) {
+            System.err.println("Error: Metric class not found: " + metricClassName);
+            System.exit(1);
+        } catch (ClassCastException e) {
+            System.err.println("Error: Class does not implement org.tori.metrics.Metric: " + metricClassName);
+            System.exit(1);
+        } catch (NoSuchMethodException e) {
+            System.err.println("Error: Metric class must have a public no-argument constructor: " + metricClassName);
+            System.exit(1);
+        } catch (InstantiationException | IllegalAccessException e) {
+            System.err.println("Error: Cannot instantiate metric class: " + metricClassName);
+            System.err.println("  Ensure the class is concrete and has a public no-argument constructor");
+            System.exit(1);
+        } catch (Exception e) {
+            System.err.println("Error: Failed to instantiate metric: " + e.getMessage());
+            System.exit(1);
+        }
+        return null; // Unreachable, but required for compilation
+    }
+    
     /**
      * Print the application banner with version information.
      */
