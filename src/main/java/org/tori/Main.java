@@ -267,8 +267,8 @@ public class Main {
                             java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
                             System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
                             System.out.println("  total_assertions: " + allOracles.size());
-                            System.out.println("  accessed_fields: " + accessedFields.size() + " " + accessedFields);
-                            System.out.println("  missing_fields: " + missingFields.size() + " " + missingFields);
+                            System.out.println("  covered_fields: " + accessedFields.size() + " " + accessedFields);
+                            System.out.println("  uncovered_fields: " + missingFields.size() + " " + missingFields);
                         } else {
                             System.out.print("  All assertions [score: " + String.format("%.2f", score));
                             System.out.println("]");
@@ -291,8 +291,8 @@ public class Main {
                                 java.util.Set<String> missingFields = sfcMetric.getLastMissingFields();
                                 System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
                                 System.out.println("  total_assertions: " + methodOracles.oracles().size());
-                                System.out.println("  accessed_fields: " + accessedFields.size() + " " + accessedFields);
-                                System.out.println("  missing_fields: " + missingFields.size() + " " + missingFields);
+                                System.out.println("  covered_fields: " + accessedFields.size() + " " + accessedFields);
+                                System.out.println("  uncovered_fields: " + missingFields.size() + " " + missingFields);
                             } else {
                                 System.out.print("  All assertions [score: " + String.format("%.2f", score));
                                 System.out.println("]");
@@ -320,8 +320,8 @@ public class Main {
                                         System.out.println("  - " + oracle);
                                         System.out.println("    state_field_coverage_score: " + String.format("%.2f", score));
                                         System.out.println("    total_assertions: 1");
-                                        System.out.println("    accessed_fields: " + accessedFields.size() + " " + accessedFields);
-                                        System.out.println("    missing_fields: " + missingFields.size() + " " + missingFields);
+                                        System.out.println("    covered_fields: " + accessedFields.size() + " " + accessedFields);
+                                        System.out.println("    uncovered_fields: " + missingFields.size() + " " + missingFields);
                                     } else {
                                         System.out.print("  - " + oracle + " [score: " + String.format("%.2f", score));
                                         System.out.println("]");
