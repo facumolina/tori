@@ -71,8 +71,7 @@ Follow these steps:
 ```bash
 mkdir -p tmp
 cd tmp
-git clone https://github.com/apache/flink
-cd ../ # Go back to the tori directory
+git clone https://github.com/apache/flink tmp/flink
 ```
 
 > [!Note]
