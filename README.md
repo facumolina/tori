@@ -112,26 +112,14 @@ Tori supports metrics that can assess the quality of test oracles. Currently, tw
 
 ### StateFieldCoverage
 
+Class to be specified: `org.tori.metrics.StateFieldCoverage`
+
 Measures the proportion of fields in a target class that are accessed by test assertions. This metric helps assess how thoroughly an oracle tests the state of an object.
 
-To use this metric, you need to specify the class `org.tori.metrics.StateFieldCoverage` and provide a configuration file with the required properties.
-
-**Configuration properties:**
-- `target_class`: Path to the target class file(s). Multiple classes can be specified as comma-separated values (required)
+**Properties in configuration file:**
+- `target_class`: Path to the target class file(s). Multiple classes can be specified as comma-separated values (required). If multiple classes are specified, the metric computes the coverage considering all fields across those classes (union).
 - `exec_level`: Execution level - `assert`, `test_method`, or `test_class` (optional, default: `assert`)
 - `iterable_field_tracking`: Enable or disable iterable field tracking (optional, default: `true`)
-
-**Multiple Target Classes:**
-
-You can specify multiple target classes by separating their paths with commas. When multiple classes are specified, the metric will consider the fields from all classes when computing the coverage score.
-
-Example configuration:
-```properties
-target_class=src/test/resources/IntsList.java,src/test/resources/Person.java
-```
-
-> [!Note]
-> When a class is specified as a target class, the fields of all reachable classes from it (including inner classes) are automatically considered. If you specify both a parent class and a subclass that is already reachable from the parent, the fields will be the same as only specifying the parent class (no duplication).
 
 **Iterable Field Tracking:**
 
@@ -152,22 +140,18 @@ Example: The `checkSize()` method in `IntsList` iterates over the list using a w
 
 ### CheckedVarsMetric
 
+Class to be specified: `org.tori.metrics.CheckedVarsMetric`
+
 Measures the proportion of variables declared in a test that are actually checked in assertions. This metric evaluates how comprehensively an oracle tests the declared variables.
 
-**Configuration properties:**
+**Properties in configuration file:**
 - `exec_level`: Execution level - `assert`, `test_method`, or `test_class` (optional, default: `assert`)
 
-### Execution Levels
-
-Metrics can be executed at three different levels:
-
-- **assert** (default): The metric is computed individually for each assertion statement
-- **test_method**: The metric is computed treating all assertions in a test method as a single one (computes the union of accessed fields or checked variables)
-- **test_class**: The metric is computed treating all assertions in a test class as a single one (computes the union across all methods). Note: This level is not allowed when analyzing a specific test method.
 
 ## Supported Assertions
 
-Tori recognizes common JUnit assertion methods, including:
+Tori recognizes all assert statements which name starts with `assert` and are statically imported from any class. This includes, but is not limited to, assertions from popular testing frameworks such as JUnit and TestNG. Examples of supported assertions include:
+
 - `assertEquals`, `assertNotEquals`
 - `assertTrue`, `assertFalse`
 - `assertNull`, `assertNotNull`
