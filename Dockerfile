@@ -5,6 +5,7 @@ RUN apt-get update
 # Install requirements
 RUN apt-get install -y openjdk-17-jdk
 RUN apt-get install -y git
+RUN apt-get install -y vim
 
 # Clone the repository
 WORKDIR /home/ubuntu
