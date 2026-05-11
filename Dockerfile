@@ -16,5 +16,8 @@ RUN ./gradlew build
 RUN ./gradlew fatJar
 
 # Clone example project
-WORKDIR /home/ubuntu
+WORKDIR /home/ubuntu/tori/tmp
 RUN git clone https://github.com/apache/flink
+
+# Back to tori directory
+WORKDIR /home/ubuntu/tori
