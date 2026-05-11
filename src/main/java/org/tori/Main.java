@@ -110,6 +110,12 @@ public class Main {
             Metric metric = null;
             if (metricClassName != null) {
                 metric = loadMetric(metricClassName, metricConfigPath, testFilePath, testMethodName);
+            } else {
+                System.out.println(ReportStyle.boldYellowWarning("No metric specified. Priting oracles without assessment."));
+                System.out.println();
+                System.out.println(ReportStyle.boldWhite("Test methods: " + targetClassOracles.size()));
+                System.out.println(ReportStyle.boldWhite("Total assertions: " + targetClassOracles.stream().mapToInt(m -> m.oracles().size()).sum()));
+                System.out.println();
             }
 
             // Print results
@@ -280,7 +286,7 @@ public class Main {
                 System.out.println("  metric-config: " + metricConfigPath);
             }
         } else {
-            System.out.println("  metric: none");
+            System.out.println("  metric: none (default: print oracles without assessment)");
         }
         System.out.println();
     }
