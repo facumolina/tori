@@ -10,6 +10,8 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
 
+import org.tori.utils.ReportStyle;
+
 import org.tori.metrics.StateFieldCoverage;
 import java.lang.ClassNotFoundException;
 
@@ -116,7 +118,7 @@ public class Main {
 
             // Parse and find assertions
             TestOracleInspector inspector = new TestOracleInspector();
-            List<MethodOracles> results = inspector.findOracles(sourceCode, testMethodName);
+            List<MethodOracles> targetClassOracles = inspector.findOracles(sourceCode, testMethodName);
 
             // Load metric if specified
             org.tori.metrics.Metric metric = null;
@@ -141,7 +143,6 @@ public class Main {
                         metric.configure(config);
                         
                         // Print Metric Configuration section
-                        System.out.println("Metric Configuration:");
                         metric.printConfigurationParams();
                         System.out.println();
                         
@@ -172,7 +173,7 @@ public class Main {
             }
 
             // Print results
-            if (results.isEmpty()) {
+            if (targetClassOracles.isEmpty()) {
                 if (testMethodName != null) {
                     System.out.println("No test method named '" + testMethodName + "' found.");
                 } else {
@@ -185,7 +186,7 @@ public class Main {
                     java.util.List<String> allOracles = new java.util.ArrayList<>();
                     StringBuilder allTestCases = new StringBuilder();
                     
-                    for (MethodOracles methodOracles : results) {
+                    for (MethodOracles methodOracles : targetClassOracles) {
                         allOracles.addAll(methodOracles.oracles());
                         allTestCases.append(methodOracles.testCaseSource()).append("\n");
                     }
@@ -198,8 +199,8 @@ public class Main {
                     System.out.println();
                 } else if (metric != null && metric.getExecutionLevel() == org.tori.metrics.ExecutionLevel.TEST_METHOD) {
                     // TEST_METHOD level: compute metric per method for all assertions in that method
-                    for (MethodOracles methodOracles : results) {
-                        System.out.println("Test Method: " + methodOracles.methodName());
+                    for (MethodOracles methodOracles : targetClassOracles) {
+                        System.out.println(ReportStyle.boldWhite("Test Method: " + methodOracles.methodName()));
                         if (methodOracles.oracles().isEmpty()) {
                             System.out.println("  No assertions found");
                         } else {
@@ -210,8 +211,8 @@ public class Main {
                     }
                 } else {
                     // ASSERT level (default): compute metric per assertion
-                    for (MethodOracles methodOracles : results) {
-                        System.out.println("Test Method: " + methodOracles.methodName());
+                    for (MethodOracles methodOracles : targetClassOracles) {
+                        System.out.println(ReportStyle.boldWhite("Test Method: " + methodOracles.methodName()));
                         if (methodOracles.oracles().isEmpty()) {
                             System.out.println("  No assertions found");
                         } else {
@@ -243,7 +244,7 @@ public class Main {
      * Print the application banner with version information.
      */
     private static void printBanner() {
-        System.out.println("> Tori " + VERSION + " - Test Oracle Inspector");
+        System.out.println(ReportStyle.boldWhite("> Tori " + VERSION + " - Test Oracle Inspector"));
         System.out.println();
     }
 
@@ -251,7 +252,7 @@ public class Main {
      * Print the execution parameters to the console.
      */
     private static void printExecutionParameters(String testFilePath, String testMethodName, String metricClassName, String metricConfigPath) {
-        System.out.println("Execution Parameters:");
+        System.out.println(ReportStyle.boldWhite("Execution Parameters:"));
         System.out.println("  test-file: " + testFilePath);
         if (testMethodName != null) {
             System.out.println("  test-method: " + testMethodName);

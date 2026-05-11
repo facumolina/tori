@@ -2,6 +2,7 @@ package org.tori.metrics;
 
 import org.tori.metrics.ExecutionLevel;
 import org.tori.metrics.Metric;
+import org.tori.utils.ReportStyle;
 import org.tori.MethodOracles;
 
 import org.tori.metrics.sfc.TargetField;
@@ -385,6 +386,7 @@ public abstract class StateFieldCoverage implements Metric {
     // Report and printing methods
     // -------------------------------------------------------------------------
     public void printConfigurationParams() {
+        System.out.println(ReportStyle.boldWhite("Metric Configuration:"));
         List<String> paths = getTargetClassPaths();
         if (paths.size() == 1) {
             System.out.println("  target_class: " + paths.get(0));
@@ -434,11 +436,11 @@ public abstract class StateFieldCoverage implements Metric {
     public void reportAssertLevel(double score, String oracle) {
         Set<String> accessedFields = getLastAccessedFields();
         Set<String> missingFields = getLastMissingFields();
-        System.out.println("  - oracle: " + oracle);
+        System.out.println(ReportStyle.boldWhite("  - oracle: " + oracle));
         System.out.println("    state_field_coverage_score: " + String.format("%.2f", score));
         System.out.println("    total_assertions: 1");
-        System.out.println("    covered_fields: " + accessedFields.size() + " " + accessedFields);
-        System.out.println("    uncovered_fields: " + missingFields.size() + " " + missingFields);
+        System.out.println(ReportStyle.boldGreenSuccess("    covered_fields: ") + accessedFields.size() + " " + accessedFields);
+        System.out.println(ReportStyle.boldRedFailure("    uncovered_fields: ") + missingFields.size() + " " + missingFields);
     }
 
     public void reportTestMethodLevel(double score, MethodOracles methodOracles) {
@@ -446,8 +448,8 @@ public abstract class StateFieldCoverage implements Metric {
         Set<String> missingFields = getLastMissingFields();
         System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
         System.out.println("  total_assertions: " + methodOracles.oracles().size());
-        System.out.println("  covered_fields: " + accessedFields.size() + " " + accessedFields);
-        System.out.println("  uncovered_fields: " + missingFields.size() + " " + missingFields);
+        System.out.println(ReportStyle.boldGreenSuccess("  covered_fields: ") + accessedFields.size() + " " + accessedFields);
+        System.out.println(ReportStyle.boldRedFailure("  uncovered_fields: ") + missingFields.size() + " " + missingFields);
     }
 
     public void reportTestClassLevel(double score, List<String> allOracles) {
@@ -455,8 +457,8 @@ public abstract class StateFieldCoverage implements Metric {
         Set<String> missingFields = getLastMissingFields();
         System.out.println("  state_field_coverage_score: " + String.format("%.2f", score));
         System.out.println("  total_assertions: " + allOracles.size());
-        System.out.println("  covered_fields: " + accessedFields.size() + " " + accessedFields);
-        System.out.println("  uncovered_fields: " + missingFields.size() + " " + missingFields);
+        System.out.println(ReportStyle.boldGreenSuccess("  covered_fields: ") + accessedFields.size() + " " + accessedFields);
+        System.out.println(ReportStyle.boldRedFailure("  uncovered_fields: ") + missingFields.size() + " " + missingFields);
     }
 
 }

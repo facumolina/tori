@@ -1,7 +1,7 @@
 package org.tori.metrics;
 
 import org.tori.MethodOracles;
-
+import org.tori.utils.ReportStyle;
 import org.treesitter.*;
 
 import java.util.HashSet;
@@ -242,6 +242,7 @@ public class CheckedVarsMetric implements Metric {
     // Report methods
     // -------------------------------------------------------------------------
     public void printConfigurationParams() {
+        System.out.println(ReportStyle.boldWhite("Metric Configuration:"));
         System.out.println("  exec_level: " + executionLevel);
     }
 
