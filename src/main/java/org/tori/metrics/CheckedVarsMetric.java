@@ -241,6 +241,10 @@ public class CheckedVarsMetric implements Metric {
     // -------------------------------------------------------------------------
     // Report methods
     // -------------------------------------------------------------------------
+    public void printConfigurationParams() {
+        System.out.println("  exec_level: " + executionLevel);
+    }
+
     public void reportAssertLevel(double score, String oracle) {
         System.out.print("  - " + oracle + " [score: " + String.format("%.2f", score));
         System.out.println("]");

@@ -69,6 +69,13 @@ public interface Metric {
     }
 
     /**
+     * Print the configuration parameters for this metric.
+     */
+    default void printConfigurationParams() {
+        // Default implementation does nothing - metrics that have configuration parameters should override this
+    }
+
+    /**
      * Report method for assert level metrics.
      * 
      * @param score The computed score for the assertion

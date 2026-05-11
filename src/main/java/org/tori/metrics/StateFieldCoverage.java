@@ -7,6 +7,7 @@ import org.tori.MethodOracles;
 import org.tori.metrics.sfc.TargetField;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
@@ -381,8 +382,55 @@ public abstract class StateFieldCoverage implements Metric {
     }
 
     // -------------------------------------------------------------------------
-    // Report methods
+    // Report and printing methods
     // -------------------------------------------------------------------------
+    public void printConfigurationParams() {
+        List<String> paths = getTargetClassPaths();
+        if (paths.size() == 1) {
+            System.out.println("  target_class: " + paths.get(0));
+        } else {
+            System.out.println("  target_classes: " + String.join(", ", paths));
+        }
+        
+        // Report identified target fields
+        Set<String> targetFields = getLastTargetFields();
+        System.out.println("  target_fields: " + targetFields.size() + " fields identified");
+        if (!targetFields.isEmpty()) {
+            List<String> sortedFields = new ArrayList<>(targetFields);
+            Collections.sort(sortedFields);
+            for (String field : sortedFields) {
+                System.out.println("    - " + field);
+            }
+        }
+        
+        // Report dependency classes
+        Set<String> loadedDeps = getLastLoadedDependencyClasses();
+        Set<String> failedDeps = getLastFailedDependencyClasses();
+        
+        if (!loadedDeps.isEmpty() || !failedDeps.isEmpty()) {
+            System.out.println("  dependency_classes:");
+            
+            if (!loadedDeps.isEmpty()) {
+                List<String> sortedLoadedDeps = new ArrayList<>(loadedDeps);
+                Collections.sort(sortedLoadedDeps);
+                for (String depClass : sortedLoadedDeps) {
+                    System.out.println("    - " + depClass + " (loaded)");
+                }
+            }
+            
+            if (!failedDeps.isEmpty()) {
+                List<String> sortedFailedDeps = new ArrayList<>(failedDeps);
+                Collections.sort(sortedFailedDeps);
+                for (String depClass : sortedFailedDeps) {
+                    System.out.println("    - " + depClass + " (WARNING: source file not found)");
+                }
+            }
+        }
+        
+        System.out.println("  exec_level: " + getExecutionLevel().getConfigValue());
+        System.out.println("  iterable_field_tracking: " + (isIterableFieldTrackingEnabled() ? "enabled" : "disabled"));
+    }
+    
     public void reportAssertLevel(double score, String oracle) {
         Set<String> accessedFields = getLastAccessedFields();
         Set<String> missingFields = getLastMissingFields();

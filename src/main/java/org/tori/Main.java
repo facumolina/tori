@@ -77,8 +77,7 @@ public class Main {
 
     public static void main(String[] args) {
         // Print banner
-        System.out.println("Tori " + VERSION + " - Test Oracle Inspector");
-        System.out.println();
+        printBanner();
         
         // Define command-line options
         Options options = buildOptions();
@@ -103,22 +102,7 @@ public class Main {
         String metricConfigPath = cmd.getOptionValue("metric-config");
 
         // Print execution parameters
-        System.out.println("Execution Parameters:");
-        System.out.println("  test-file: " + testFilePath);
-        if (testMethodName != null) {
-            System.out.println("  test-method: " + testMethodName);
-        } else {
-            System.out.println("  test-method: all");
-        }
-        if (metricClassName != null) {
-            System.out.println("  metric: " + metricClassName);
-            if (metricConfigPath != null) {
-                System.out.println("  metric-config: " + metricConfigPath);
-            }
-        } else {
-            System.out.println("  metric: none");
-        }
-        System.out.println();
+        printExecutionParameters(testFilePath, testMethodName, metricClassName, metricConfigPath);
 
         try {
             // Read the test file
@@ -158,58 +142,7 @@ public class Main {
                         
                         // Print Metric Configuration section
                         System.out.println("Metric Configuration:");
-                        if (metric instanceof StateFieldCoverage) {
-                            StateFieldCoverage sfcMetric = (StateFieldCoverage) metric;
-                            java.util.List<String> paths = sfcMetric.getTargetClassPaths();
-                            if (paths.size() == 1) {
-                                System.out.println("  target_class: " + paths.get(0));
-                            } else {
-                                System.out.println("  target_classes: " + String.join(", ", paths));
-                            }
-                            
-                            // Report identified target fields
-                            java.util.Set<String> targetFields = sfcMetric.getLastTargetFields();
-                            System.out.println("  target_fields: " + targetFields.size() + " fields identified");
-                            if (!targetFields.isEmpty()) {
-                                java.util.List<String> sortedFields = new java.util.ArrayList<>(targetFields);
-                                java.util.Collections.sort(sortedFields);
-                                for (String field : sortedFields) {
-                                    System.out.println("    - " + field);
-                                }
-                            }
-                            
-                            // Report dependency classes
-                            java.util.Set<String> loadedDeps = sfcMetric.getLastLoadedDependencyClasses();
-                            java.util.Set<String> failedDeps = sfcMetric.getLastFailedDependencyClasses();
-                            
-                            if (!loadedDeps.isEmpty() || !failedDeps.isEmpty()) {
-                                System.out.println("  dependency_classes:");
-                                
-                                if (!loadedDeps.isEmpty()) {
-                                    java.util.List<String> sortedLoadedDeps = new java.util.ArrayList<>(loadedDeps);
-                                    java.util.Collections.sort(sortedLoadedDeps);
-                                    for (String depClass : sortedLoadedDeps) {
-                                        System.out.println("    - " + depClass + " (loaded)");
-                                    }
-                                }
-                                
-                                if (!failedDeps.isEmpty()) {
-                                    java.util.List<String> sortedFailedDeps = new java.util.ArrayList<>(failedDeps);
-                                    java.util.Collections.sort(sortedFailedDeps);
-                                    for (String depClass : sortedFailedDeps) {
-                                        System.out.println("    - " + depClass + " (WARNING: source file not found)");
-                                    }
-                                }
-                            }
-                            
-                            System.out.println("  exec_level: " + sfcMetric.getExecutionLevel().getConfigValue());
-                            System.out.println("  iterable_field_tracking: " + (sfcMetric.isIterableFieldTrackingEnabled() ? "enabled" : "disabled"));
-                        } else {
-                            // For other metrics, print all config properties
-                            for (String key : config.stringPropertyNames()) {
-                                System.out.println("  " + key + ": " + config.getProperty(key));
-                            }
-                        }
+                        metric.printConfigurationParams();
                         System.out.println();
                         
                         // Validate execution level constraints
@@ -305,4 +238,35 @@ public class Main {
             System.exit(1);
         }
     }
+
+    /**
+     * Print the application banner with version information.
+     */
+    private static void printBanner() {
+        System.out.println("> Tori " + VERSION + " - Test Oracle Inspector");
+        System.out.println();
+    }
+
+    /**
+     * Print the execution parameters to the console.
+     */
+    private static void printExecutionParameters(String testFilePath, String testMethodName, String metricClassName, String metricConfigPath) {
+        System.out.println("Execution Parameters:");
+        System.out.println("  test-file: " + testFilePath);
+        if (testMethodName != null) {
+            System.out.println("  test-method: " + testMethodName);
+        } else {
+            System.out.println("  test-method: all");
+        }
+        if (metricClassName != null) {
+            System.out.println("  metric: " + metricClassName);
+            if (metricConfigPath != null) {
+                System.out.println("  metric-config: " + metricConfigPath);
+            }
+        } else {
+            System.out.println("  metric: none");
+        }
+        System.out.println();
+    }
+
 }
