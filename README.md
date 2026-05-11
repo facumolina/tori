@@ -60,14 +60,48 @@ This will report, for each assertion in the test class, the proportion of fields
 
 ### Real Example
 
+Here we provide an example of how to use tori to analyze a real test class from an open source project. 
+These steps can be followed to analyze any test class from any project.
 
+In this example, we will analyze the oracles in the `testGetMoreThanAvailable` test method the test class [`ByteArrayInputStreamWithPosTest`](https://github.com/apache/flink/blob/883ed7d37bcf5c7e38ceb01b3652a161bc26feae/flink-core/src/test/java/org/apache/flink/core/memory/ByteArrayInputStreamWithPosTest.java) from the popular open source project Apache Flink, using the StateFieldCoverage metric. The test class contains tests for the `ByteArrayInputStreamWithPos` class, which is a custom implementation of `ByteArrayInputStream` used in Flink.
+
+1. First, we need to obtain the test file. We can download the file from the GitHub repository and save it locally. 
+Let's create a tmp directory and download the file there:
+
+```bash
+mkdir -p tmp
+cd tmp
+git clone https://github.com/apache/flink
+cd ../ # Go back to the tori directory
+```
+
+> [!Note]
+> If you are using Docker, the apache flink code is already included, so you can skip the download step.
+
+2. Now, we need to configure the metric configuration file. We will specify `ByteArrayInputStreamWithPos` as the target class and set the execution level to `test_method`, meaning the metric will be computed treating all assertions in the specified test method as a single one (computing the union of accessed fields across all assertions in the method). For this, we create a properties file `apache_flink_test.properties` with the following content:
+
+```properties
+target_class=tmp/flink/flink-core/src/main/java/org/apache/flink/core/memory/ByteArrayInputStreamWithPos.java
+exec_level=test_method
+```
+
+3. Finally, we can run tori with the following command:
+
+```bash
+java -jar build/libs/tori-1.0.0-all.jar \
+  -t tmp/flink/flink-core/src/test/java/org/apache/flink/core/memory/ByteArrayInputStreamWithPosTest.java \
+  -m testGetMoreThanAvailable \
+  -metric org.tori.metrics.StateFieldCoverage \
+  -metric-config apache_flink_test.properties
+```
+This will report, for the `testGetMoreThanAvailable` test method, the proportion of fields in `ByteArrayInputStreamWithPos` that are accessed by assertions in that method.
 
 ### Command-Line Options
 
 - `-t, --test-file <FILE>`: Path to the test file (required)
 - `-m, --test-method <METHOD>`: Name of the specific test method to analyze (optional)
-- `--metric <METRIC_CLASS>`: Class name of the metric to use for oracle assessment (optional)
-- `-mc, --metric-config <CONFIG_FILE>`: Path to the properties file with metric configuration (optional)
+- `-metric <METRIC_CLASS>`: Class name of the metric to use for oracle assessment (optional)
+- `-mc, -metric-config <CONFIG_FILE>`: Path to the properties file with metric configuration (optional)
 
 ## Metrics
 
@@ -75,7 +109,9 @@ Tori supports metrics that can assess the quality of test oracles. Currently, tw
 
 ### StateFieldCoverage
 
-Measures the proportion of fields in a target class that are accessed by test assertions. This metric helps assess how comprehensively an oracle tests the state of an object.
+Measures the proportion of fields in a target class that are accessed by test assertions. This metric helps assess how thoroughly an oracle tests the state of an object.
+
+To use this metric, you need to specify the class `org.tori.metrics.StateFieldCoverage` and provide a configuration file with the required properties.
 
 **Configuration properties:**
 - `target_class`: Path to the target class file(s). Multiple classes can be specified as comma-separated values (required)
@@ -91,7 +127,8 @@ Example configuration:
 target_class=src/test/resources/IntsList.java,src/test/resources/Person.java
 ```
 
-Note: When a class is specified as a target class, the fields of all reachable classes from it (including inner classes) are automatically considered. If you specify both a parent class and a subclass that is already reachable from the parent, the fields will be the same as only specifying the parent class (no duplication).
+> [!Note]
+> When a class is specified as a target class, the fields of all reachable classes from it (including inner classes) are automatically considered. If you specify both a parent class and a subclass that is already reachable from the parent, the fields will be the same as only specifying the parent class (no duplication).
 
 **Iterable Field Tracking:**
 
