@@ -52,6 +52,8 @@ class StateFieldCoverageFieldAccessedInMethodTest {
 
         assertTrue(metric.getLastAccessedFields().size() > 0, "Should have identified accessed fields");
 
+        assertEquals(0.5, score, 0.01, "Score should be 50.0");
+
         assertTrue(metric.getLastAccessedFields().stream().anyMatch(f -> f.contains("ByteArrayInputStreamWithPos.position")),
             "Should have identified access to 'ByteArrayInputStreamWithPos.position' field");
 
