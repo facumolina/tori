@@ -186,10 +186,12 @@ public class StateFieldCoverageJava extends StateFieldCoverage {
                 Set<String> referencedClassPaths = findReferencedClassPaths(classPath, classSource,
                         fieldTypes, isRootClass);
 
-                for (String referencedClassPath : referencedClassPaths) {
-                    Set<String> referencedFields = getAllFieldsInClassRecursive(referencedClassPath,
-                            new HashSet<>(visitedClasses), false);
-                    fields.addAll(referencedFields);
+                if (!ignoreDependencyClassesFields) {
+                    for (String referencedClassPath : referencedClassPaths) {
+                        Set<String> referencedFields = getAllFieldsInClassRecursive(referencedClassPath,
+                                new HashSet<>(visitedClasses), false);
+                        fields.addAll(referencedFields);
+                    }
                 }
 
                 String superclassName = findTopLevelSuperclassName(rootNode, classSource);

@@ -40,8 +40,10 @@ public abstract class StateFieldCoverage implements Metric {
     protected boolean detailedReportingEnabled;
     protected boolean iterableFieldTrackingEnabled;
     protected boolean includeStaticFields;
+    protected boolean ignoreDependencyClassesFields;
     protected boolean includeConcreteParentClassFields;
     protected boolean assertOnlyTargetClassMethods;
+    
 
     private Set<TargetField> lastTargetFields;
     private Set<TargetField> lastAccessedFields;
@@ -56,6 +58,7 @@ public abstract class StateFieldCoverage implements Metric {
         this.detailedReportingEnabled = true;
         this.iterableFieldTrackingEnabled = true;
         this.includeStaticFields = false;
+        this.ignoreDependencyClassesFields = false;
         this.includeConcreteParentClassFields = false;
         this.assertOnlyTargetClassMethods = false;
         this.lastTargetFields = new HashSet<>();
@@ -109,6 +112,11 @@ public abstract class StateFieldCoverage implements Metric {
         String includeStaticFieldsValue = config.getProperty("include_static_fields");
         if (includeStaticFieldsValue != null && !includeStaticFieldsValue.isEmpty()) {
             this.includeStaticFields = Boolean.parseBoolean(includeStaticFieldsValue);
+        }
+
+        String ignoreDependencyClassesFieldsValue = config.getProperty("ignore_dependency_classes_fields");
+        if (ignoreDependencyClassesFieldsValue != null && !ignoreDependencyClassesFieldsValue.isEmpty()) {
+            this.ignoreDependencyClassesFields = Boolean.parseBoolean(ignoreDependencyClassesFieldsValue);
         }
 
         String includeConcreteParentClassFieldsValue = config.getProperty("include_concrete_parent_class_fields");
