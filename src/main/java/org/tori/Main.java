@@ -18,7 +18,7 @@ import java.lang.ClassNotFoundException;
 
 public class Main {
     
-    private static final String VERSION = "1.0.0";
+    private static final String VERSION = Main.class.getPackage().getImplementationVersion();
 
     /**
      * Builds the command-line options for the application.

@@ -20,7 +20,7 @@ To install tori locally, clone the repository and build the project using Gradle
 git clone https://github.com/facumolina/tori
 cd tori
 ./gradlew build
-./gradlew fatJar # Creates build/libs/tori-1.0.0-all.jar with all dependencies included
+./gradlew fatJar # Creates build/libs/tori-1.0.2-all.jar with all dependencies included
 ```
 
 ### Docker
@@ -50,7 +50,7 @@ The test class [`IntsListTest`](src/test/resources/IntsListTest.java) contains s
 To analyze oracles in all test methods of `IntsListTest` using the StateFieldCoverage metric with a specific configuration file, you can run the following command:
 
 ```bash
-java -jar build/libs/tori-1.0.0-all.jar \
+java -jar build/libs/tori-1.0.2-all.jar \
   -t src/test/resources/IntsListTest.java \
   -metric org.tori.metrics.StateFieldCoverage \
   -metric-config src/test/resources/state_field_coverage.properties
@@ -98,7 +98,7 @@ This will report, for the `testGetMoreThanAvailable` test method, the proportion
 For this example, the state field coverage score is 0.75, meaning that 3 out of the 4 fields in `ByteArrayInputStreamWithPos` are accessed by assertions in the `testGetMoreThanAvailable` test method, 
 and the only uncovered field is `mark`, which is not accessed by any assertion in that method.
 
-### Command-Line Options
+## Command-Line Options
 
 - `-t, --test-file <FILE>`: Path to the test file (required)
 - `-m, --test-method <METHOD>`: Name of the specific test method to analyze (optional)
